@@ -8,4 +8,5 @@ package pb;
 
 service Serf{
     rpc hello(google.protobuf.StringValue) returns (google.protobuf.StringValue);
+    rpc helloStream(google.protobuf.StringValue) returns (stream google.protobuf.StringValue);
 }

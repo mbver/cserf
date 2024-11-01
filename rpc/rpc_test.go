@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/mbver/cserf/rpc/client"
@@ -20,4 +21,10 @@ func TestRPC_Hello(t *testing.T) {
 	res, err := c.Hello("world")
 	require.Nil(t, err)
 	require.Contains(t, res, "world")
+
+	res, err = c.HelloStream("world")
+	require.Nil(t, err)
+	for i := 0; i < 3; i++ {
+		require.Contains(t, res, fmt.Sprintf("world%d", i))
+	}
 }

@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SerfClient interface {
 	Hello(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (*wrapperspb.StringValue, error)
+	HelloStream(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error)
 }
 
 type serfClient struct {
@@ -43,11 +44,44 @@ func (c *serfClient) Hello(ctx context.Context, in *wrapperspb.StringValue, opts
 	return out, nil
 }
 
+func (c *serfClient) HelloStream(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Serf_ServiceDesc.Streams[0], "/pb.Serf/helloStream", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &serfHelloStreamClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Serf_HelloStreamClient interface {
+	Recv() (*wrapperspb.StringValue, error)
+	grpc.ClientStream
+}
+
+type serfHelloStreamClient struct {
+	grpc.ClientStream
+}
+
+func (x *serfHelloStreamClient) Recv() (*wrapperspb.StringValue, error) {
+	m := new(wrapperspb.StringValue)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // SerfServer is the server API for Serf service.
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
 type SerfServer interface {
 	Hello(context.Context, *wrapperspb.StringValue) (*wrapperspb.StringValue, error)
+	HelloStream(*wrapperspb.StringValue, Serf_HelloStreamServer) error
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -57,6 +91,9 @@ type UnimplementedSerfServer struct {
 
 func (UnimplementedSerfServer) Hello(context.Context, *wrapperspb.StringValue) (*wrapperspb.StringValue, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Hello not implemented")
+}
+func (UnimplementedSerfServer) HelloStream(*wrapperspb.StringValue, Serf_HelloStreamServer) error {
+	return status.Errorf(codes.Unimplemented, "method HelloStream not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
 
@@ -89,6 +126,27 @@ func _Serf_Hello_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Serf_HelloStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(wrapperspb.StringValue)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(SerfServer).HelloStream(m, &serfHelloStreamServer{stream})
+}
+
+type Serf_HelloStreamServer interface {
+	Send(*wrapperspb.StringValue) error
+	grpc.ServerStream
+}
+
+type serfHelloStreamServer struct {
+	grpc.ServerStream
+}
+
+func (x *serfHelloStreamServer) Send(m *wrapperspb.StringValue) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // Serf_ServiceDesc is the grpc.ServiceDesc for Serf service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -101,6 +159,12 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Serf_Hello_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "helloStream",
+			Handler:       _Serf_HelloStream_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "pb/serf_service.proto",
 }
