@@ -43,7 +43,7 @@ func generateSelfSignedCert() (tls.Certificate, *x509.Certificate, error) {
 
 	// Add Subject Alternative Names (SANs)
 	certTemplate.DNSNames = []string{"localhost"}
-	certTemplate.IPAddresses = []net.IP{net.ParseIP("127.0.0.1")}
+	certTemplate.IPAddresses = []net.IP{[]byte{127, 0, 0, 1}} // for checking addresses resolved by dns
 
 	// Create the certificate using the template and the private key (self-signed)
 	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, &certTemplate, &priv.PublicKey, priv)
