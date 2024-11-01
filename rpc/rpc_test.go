@@ -74,6 +74,34 @@ func generateSelfSignedCert() (tls.Certificate, *x509.Certificate, error) {
 	return tlsCert, cert, nil
 }
 
+func TestRPC_MismatchedCerts(t *testing.T) {
+	addr := "localhost:50051"
+	scert, _, err := generateSelfSignedCert()
+	require.Nil(t, err)
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{scert},
+	})
+
+	s, err := server.CreateServer(addr, creds)
+	require.Nil(t, err)
+	defer s.Stop()
+
+	_, ccert, err := generateSelfSignedCert()
+	require.Nil(t, err)
+	certPool := x509.NewCertPool()
+	certPool.AddCert(ccert)
+	creds = credentials.NewTLS(&tls.Config{
+		RootCAs: certPool,
+	})
+
+	c, err := client.CreateClient(addr, creds)
+	require.Nil(t, err)
+	defer c.Close()
+
+	_, err = c.Hello("world")
+	require.NotNil(t, err)
+}
+
 func TestRPC_Hello(t *testing.T) {
 	addr := "localhost:50051"
 	scert, ccert, err := generateSelfSignedCert()
