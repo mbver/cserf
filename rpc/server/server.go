@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/mbver/cserf/rpc/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -15,12 +16,12 @@ type Server struct {
 	pb.UnimplementedSerfServer
 }
 
-func CreateServer(addr string) (*grpc.Server, error) {
+func CreateServer(addr string, cert credentials.TransportCredentials) (*grpc.Server, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	s := grpc.NewServer()
+	s := grpc.NewServer(grpc.Creds(cert))
 	pb.RegisterSerfServer(s, &Server{})
 
 	go func() {

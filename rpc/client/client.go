@@ -9,7 +9,7 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/mbver/cserf/rpc/pb"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 )
 
 type Client struct {
@@ -17,8 +17,8 @@ type Client struct {
 	conn   *grpc.ClientConn
 }
 
-func CreateClient(addr string) (*Client, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func CreateClient(addr string, creds credentials.TransportCredentials) (*Client, error) {
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return nil, err
 	}
