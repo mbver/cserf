@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option go_package = "rpc/pb";
+
+import "google/protobuf/wrappers.proto";
+
+package pb;
+
+service Serf{
+    rpc hello(google.protobuf.StringValue) returns (google.protobuf.StringValue);
+}
