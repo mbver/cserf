@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -20,11 +21,12 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-func generateSelfSignedCert() (tls.Certificate, *x509.Certificate, error) {
+func generateSelfSignedCert() (string, string, func(), error) {
+	cleanup := func() {}
 	// Generate a private key
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return tls.Certificate{}, nil, err
+		return "", "", cleanup, err
 	}
 
 	// Create a certificate template
@@ -48,48 +50,71 @@ func generateSelfSignedCert() (tls.Certificate, *x509.Certificate, error) {
 	// Create the certificate using the template and the private key (self-signed)
 	certDER, err := x509.CreateCertificate(rand.Reader, &certTemplate, &certTemplate, &priv.PublicKey, priv)
 	if err != nil {
-		return tls.Certificate{}, nil, err
+		return "", "", cleanup, err
 	}
 
 	// Encode the private key and certificate as PEM
 	privBytes, err := x509.MarshalECPrivateKey(priv)
 	if err != nil {
-		return tls.Certificate{}, nil, err
+		return "", "", cleanup, err
 	}
-	privPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: privBytes})
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 
-	// Create a TLS certificate for use with gRPC
-	tlsCert, err := tls.X509KeyPair(certPEM, privPEM)
+	tempDir, err := os.MkdirTemp("", "certs")
 	if err != nil {
-		return tls.Certificate{}, nil, err
+		return "", "", cleanup, err
 	}
-
-	// Parse the certificate to get the x509 certificate
-	cert, err := x509.ParseCertificate(certDER)
+	cleanup = func() { os.Remove(tempDir) }
+	certFile := tempDir + "/server.crt"
+	certOut, err := os.Create(certFile)
 	if err != nil {
-		return tls.Certificate{}, nil, err
+		return "", "", cleanup, err
+	}
+	defer certOut.Close()
+
+	keyFile := tempDir + "/server.key"
+	keyOut, err := os.Create(keyFile)
+	if err != nil {
+		return "", "", cleanup, err
+	}
+	defer keyOut.Close()
+
+	if err := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certDER}); err != nil {
+		return "", "", cleanup, err
 	}
 
-	return tlsCert, cert, nil
+	if err := pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: privBytes}); err != nil {
+		return "", "", cleanup, err
+	}
+	return certFile, keyFile, cleanup, nil
 }
 
 func TestRPC_MismatchedCerts(t *testing.T) {
 	addr := "localhost:50051"
-	scert, _, err := generateSelfSignedCert()
+	certFile1, keyfile1, cleanup1, err := generateSelfSignedCert()
+	defer cleanup1()
 	require.Nil(t, err)
+
+	serverCert, err := tls.LoadX509KeyPair(certFile1, keyfile1)
+	require.Nil(t, err)
+
 	creds := credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{scert},
+		Certificates: []tls.Certificate{serverCert},
 	})
 
 	s, err := server.CreateServer(addr, creds)
 	require.Nil(t, err)
 	defer s.Stop()
 
-	_, ccert, err := generateSelfSignedCert()
+	certFile2, _, cleanup2, err := generateSelfSignedCert()
+	defer cleanup2()
 	require.Nil(t, err)
+
+	caCert, err := os.ReadFile(certFile2)
+	require.Nil(t, err)
+
 	certPool := x509.NewCertPool()
-	certPool.AddCert(ccert)
+	certPool.AppendCertsFromPEM(caCert)
+
 	creds = credentials.NewTLS(&tls.Config{
 		RootCAs: certPool,
 	})
@@ -104,18 +129,24 @@ func TestRPC_MismatchedCerts(t *testing.T) {
 
 func TestRPC_Hello(t *testing.T) {
 	addr := "localhost:50051"
-	scert, ccert, err := generateSelfSignedCert()
+	certFile, keyFile, cleanup, err := generateSelfSignedCert()
+	defer cleanup()
+	require.Nil(t, err)
+
+	servertCert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	require.Nil(t, err)
 	creds := credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{scert},
+		Certificates: []tls.Certificate{servertCert},
 	})
 
 	s, err := server.CreateServer(addr, creds)
 	require.Nil(t, err)
 	defer s.Stop()
 
+	caCert, err := os.ReadFile(certFile)
+	require.Nil(t, err)
 	certPool := x509.NewCertPool()
-	certPool.AddCert(ccert)
+	certPool.AppendCertsFromPEM(caCert)
 	creds = credentials.NewTLS(&tls.Config{
 		RootCAs: certPool,
 	})
