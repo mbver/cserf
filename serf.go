@@ -1,7 +1,6 @@
 package serf
 
 import (
-	"fmt"
 	"log"
 
 	memberlist "github.com/mbver/mlist"
@@ -10,6 +9,7 @@ import (
 type Serf struct {
 	mlist      memberlist.Memberlist
 	broadcasts *broadcastManager
+	query      *QueryManager
 	userMsgCh  chan []byte
 	logger     *log.Logger
 	shutdownCh chan struct{}
@@ -24,22 +24,6 @@ func NewSerf() *Serf {
 	return nil
 }
 
-func (s *Serf) receiveUserMsg() {
-	for {
-		select {
-		case msg := <-s.userMsgCh:
-			fmt.Println(string(msg))
-		case <-s.shutdownCh:
-			return
-		}
-	}
-}
-
-// unique id, channel, gather responses, stream to channel
-// set timeout? receiver must drain the channel continuously
-func (s *Serf) Query() {
-
-}
 func (s *Serf) Shutdown() {
 	close(s.shutdownCh)
 }

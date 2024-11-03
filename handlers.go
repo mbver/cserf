@@ -10,22 +10,8 @@ type msgType uint8
 const (
 	msgQueryType msgType = iota
 	msgQueryRespType
+	msgActionType
 )
-
-type msgQuery struct {
-	ID         string
-	SourceIP   net.IP
-	SourcePort uint16
-}
-
-type msgQueryResponse struct {
-	ID string
-}
-
-// cluster action request
-type msgAction struct {
-	Name string
-}
 
 func (t msgType) Code() int {
 	return int(t)
@@ -40,6 +26,11 @@ func (t msgType) String() string {
 	return "unknownn message type"
 }
 
+// cluster action request
+type msgAction struct {
+	Name string
+}
+
 func (s *Serf) receiveMsgs() {
 	for {
 		select {
@@ -50,8 +41,6 @@ func (s *Serf) receiveMsgs() {
 		}
 	}
 }
-
-var broadcasted map[string]bool
 
 func (s *Serf) handleMsg(msg []byte) {
 	if len(msg) == 0 {
@@ -66,11 +55,8 @@ func (s *Serf) handleMsg(msg []byte) {
 			s.logger.Printf("[ERR] serf: Error decoding query msessage: %s", err)
 			return
 		}
-		fmt.Println("got msg query", q.ID)
-		if !broadcasted[q.ID] {
-			s.broadcasts.broadcastQuery(msgQueryType, q, nil)
-			broadcasted[q.ID] = true
-		}
+		s.handleQuery(&q)
+
 	case msgQueryRespType:
 		var r msgQueryResponse
 		if err := decode(msg[1:], &r); err != nil {
@@ -78,5 +64,34 @@ func (s *Serf) handleMsg(msg []byte) {
 			return
 		}
 		fmt.Println("got msg query response")
+		s.handleQueryResponse(&r)
 	}
+}
+
+func (s *Serf) handleQuery(q *msgQuery) {
+	if s.query.processed[q.ID] {
+		return
+	}
+	s.broadcasts.broadcastQuery(msgQueryType, *q, nil)
+	s.query.processed[q.ID] = true
+	resp := msgQueryResponse{
+		ID:   q.ID,
+		From: s.mlist.ID(),
+	}
+	msg, err := encode(msgQueryRespType, resp)
+	if err != nil {
+		s.logger.Printf("[ERR] serf: encode query response message failed")
+	}
+	addr := net.UDPAddr{
+		IP:   q.SourceIP,
+		Port: int(q.SourcePort),
+	}
+	err = s.mlist.SendUserMsg(&addr, msg)
+	if err != nil {
+		s.logger.Printf("[ERR] serf: failed to send query response to %s", addr)
+	}
+}
+
+func (s *Serf) handleQueryResponse(r *msgQueryResponse) {
+	s.query.invokeResponseHandler(r)
 }
