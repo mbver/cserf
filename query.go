@@ -75,6 +75,7 @@ func (s *Serf) Query(res chan string) error {
 		SourceIP:   addr,
 		SourcePort: port,
 	}
+	s.handleQuery(&q)
 	s.query.setResponseHandler(q.ID, res, 3*time.Second) // TODO: have it as input or config value
 	return nil
 }

@@ -8,8 +8,12 @@ type broadcastManager struct {
 	queryBroadcasts  *memberlist.TransmitCapQueue
 }
 
-func newBroadcastManager() *broadcastManager {
-	return nil
+func newBroadcastManager(numNodes func() int, transmitScale int) *broadcastManager {
+	return &broadcastManager{
+		serfBroadcasts:   memberlist.NewBroadcastQueue(numNodes, transmitScale),
+		actionBroadcasts: memberlist.NewBroadcastQueue(numNodes, transmitScale),
+		queryBroadcasts:  memberlist.NewBroadcastQueue(numNodes, transmitScale),
+	}
 }
 
 func (m *broadcastManager) GetBroadcasts(overhead, limit int) [][]byte {

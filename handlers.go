@@ -1,7 +1,6 @@
 package serf
 
 import (
-	"fmt"
 	"net"
 )
 
@@ -63,7 +62,6 @@ func (s *Serf) handleMsg(msg []byte) {
 			s.logger.Printf("[ERR] serf: Error decoding query response messages: %s", err)
 			return
 		}
-		fmt.Println("got msg query response")
 		s.handleQueryResponse(&r)
 	}
 }

@@ -5,16 +5,17 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	memberlist "github.com/mbver/mlist"
 	"github.com/mbver/mlist/testaddr"
 	"github.com/stretchr/testify/require"
 )
 
-func noScheduleMemberlistConfig() *memberlist.Config {
+func testMemberlistConfig() *memberlist.Config {
 	conf := memberlist.DefaultLANConfig()
 	conf.ProbeInterval = 0
-	conf.GossipInterval = 0
+	conf.GossipInterval = 5 * time.Millisecond
 	conf.PushPullInterval = 0
 	conf.ReapInterval = 0
 	return conf
@@ -28,7 +29,7 @@ func combineCleanup(cleanups ...func()) func() {
 	}
 }
 
-func noScheduleTestNode() (*Serf, func(), error) {
+func testNode() (*Serf, func(), error) {
 	b := &SerfBuilder{}
 	cleanup := func() {}
 
@@ -40,7 +41,7 @@ func noScheduleTestNode() (*Serf, func(), error) {
 	b.WithKeyring(keyRing)
 
 	ip, cleanup := testaddr.BindAddrs.NextAvailAddr()
-	mconf := noScheduleMemberlistConfig()
+	mconf := testMemberlistConfig()
 	mconf.BindAddr = ip.String()
 	mconf.Label = "label"
 	b.WithMemberlistConfig(mconf)
@@ -60,12 +61,12 @@ func noScheduleTestNode() (*Serf, func(), error) {
 	return s, cleanup1, nil
 }
 
-func twoNodesNoSchedule() (*Serf, *Serf, func(), error) {
-	s1, cleanup1, err := noScheduleTestNode()
+func twoNodes() (*Serf, *Serf, func(), error) {
+	s1, cleanup1, err := testNode()
 	if err != nil {
 		return nil, nil, cleanup1, err
 	}
-	s2, cleanup2, err := noScheduleTestNode()
+	s2, cleanup2, err := testNode()
 	cleanup := combineCleanup(cleanup1, cleanup2)
 	if err != nil {
 		return nil, nil, cleanup, err
@@ -73,22 +74,85 @@ func twoNodesNoSchedule() (*Serf, *Serf, func(), error) {
 	return s1, s2, cleanup, err
 }
 
+func threeNodes() (*Serf, *Serf, *Serf, func(), error) {
+	s1, s2, cleanup1, err := twoNodes()
+	if err != nil {
+		return nil, nil, nil, cleanup1, err
+	}
+	s3, cleanup2, err := testNode()
+	cleanup := combineCleanup(cleanup1, cleanup2)
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+	return s1, s2, s3, cleanup, err
+}
+
 func TestSerf_Create(t *testing.T) {
-	_, cleanup, err := noScheduleTestNode()
+	_, cleanup, err := testNode()
 	defer cleanup()
 	require.Nil(t, err)
 }
 
 func TestSerf_Join(t *testing.T) {
-	s1, s2, cleanup, err := twoNodesNoSchedule()
+	s1, s2, cleanup, err := twoNodes()
 	defer cleanup()
 	require.Nil(t, err)
 
-	ip, port, err := s2.mlist.GetAdvertiseAddr()
+	addr, err := s2.AdvertiseAddress()
 	require.Nil(t, err)
 
-	addr := fmt.Sprintf("%s:%d", ip, port)
 	n, err := s1.Join([]string{addr})
 	require.Nil(t, err)
 	require.Equal(t, 1, n)
+}
+
+func TestSerf_Query(t *testing.T) {
+	s1, s2, s3, cleanup, err := threeNodes()
+	defer cleanup()
+	require.Nil(t, err)
+
+	addr2, err := s2.AdvertiseAddress()
+	require.Nil(t, err)
+
+	addr3, err := s3.AdvertiseAddress()
+	require.Nil(t, err)
+
+	n, err := s1.Join([]string{addr2, addr3})
+	require.Nil(t, err)
+	require.Equal(t, 2, n)
+	respCh := make(chan string, 3)
+	s1.Query(respCh)
+
+	success, msg := retry(5, func() (bool, string) {
+		time.Sleep(10 * time.Millisecond)
+		if len(respCh) != 3 {
+			return false, fmt.Sprintf("receive only %d/3", len(respCh))
+		}
+		found := make([]bool, 3)
+		for i := 0; i < 3; i++ {
+			str := <-respCh
+			for i, s := range []*Serf{s1, s2, s3} {
+				if str == s.ID() {
+					found[i] = true
+				}
+			}
+		}
+		for i, v := range found {
+			if !v {
+				return false, fmt.Sprintf("missing %d", i)
+			}
+		}
+		return true, ""
+	})
+	require.True(t, success, msg)
+}
+
+func retry(times int, fn func() (bool, string)) (success bool, msg string) {
+	for i := 0; i < times; i++ {
+		success, msg = fn()
+		if success {
+			return
+		}
+	}
+	return
 }
