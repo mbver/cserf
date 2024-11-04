@@ -88,7 +88,7 @@ func (s *Serf) handleQuery(q *msgQuery) {
 	}
 	err = s.mlist.SendUserMsg(&addr, msg)
 	if err != nil {
-		s.logger.Printf("[ERR] serf: failed to send query response to %s", addr)
+		s.logger.Printf("[ERR] serf: failed to send query response to %s", addr.String())
 	}
 }
 

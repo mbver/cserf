@@ -22,14 +22,22 @@ type msgQueryResponse struct {
 
 type QueryResponseHandler struct {
 	respCh chan string
-	// have a map to track duplicate responses (for relay, skip for now)
+	// TODO: have a map to track duplicate responses (for relay, skip for now)
 }
 
 type QueryManager struct {
 	l         sync.Mutex
 	handlers  map[string]*QueryResponseHandler
-	logger    log.Logger
-	processed map[string]bool // for not rebroadcast already handle query msg. later will use buffer
+	logger    *log.Logger
+	processed map[string]bool // TODO: for not rebroadcast already handle query msg. later will use buffer
+}
+
+func newQueryManager(logger *log.Logger) *QueryManager {
+	return &QueryManager{
+		handlers:  make(map[string]*QueryResponseHandler),
+		logger:    logger,
+		processed: make(map[string]bool),
+	}
 }
 
 func (m *QueryManager) setResponseHandler(id string, ch chan string, timeout time.Duration) {
@@ -52,7 +60,7 @@ func (m *QueryManager) invokeResponseHandler(r *msgQueryResponse) {
 	}
 	select {
 	case h.respCh <- r.From:
-	case <-time.After(2 * time.Second): // have a fixed value in config
+	case <-time.After(2 * time.Second): // TODO: have a fixed value in config
 		m.logger.Printf("[ERR] serf query: timeout streaming response from %s", r.From)
 	}
 }
@@ -67,6 +75,6 @@ func (s *Serf) Query(res chan string) error {
 		SourceIP:   addr,
 		SourcePort: port,
 	}
-	s.query.setResponseHandler(q.ID, res, 3*time.Second)
+	s.query.setResponseHandler(q.ID, res, 3*time.Second) // TODO: have it as input or config value
 	return nil
 }
