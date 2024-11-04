@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -25,6 +26,7 @@ const _ = grpc.SupportPackageIsVersion7
 type SerfClient interface {
 	Hello(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (*wrapperspb.StringValue, error)
 	HelloStream(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error)
+	Query(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Serf_QueryClient, error)
 }
 
 type serfClient struct {
@@ -76,12 +78,45 @@ func (x *serfHelloStreamClient) Recv() (*wrapperspb.StringValue, error) {
 	return m, nil
 }
 
+func (c *serfClient) Query(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Serf_QueryClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Serf_ServiceDesc.Streams[1], "/pb.Serf/query", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &serfQueryClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Serf_QueryClient interface {
+	Recv() (*wrapperspb.StringValue, error)
+	grpc.ClientStream
+}
+
+type serfQueryClient struct {
+	grpc.ClientStream
+}
+
+func (x *serfQueryClient) Recv() (*wrapperspb.StringValue, error) {
+	m := new(wrapperspb.StringValue)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // SerfServer is the server API for Serf service.
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
 type SerfServer interface {
 	Hello(context.Context, *wrapperspb.StringValue) (*wrapperspb.StringValue, error)
 	HelloStream(*wrapperspb.StringValue, Serf_HelloStreamServer) error
+	Query(*emptypb.Empty, Serf_QueryServer) error
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -94,6 +129,9 @@ func (UnimplementedSerfServer) Hello(context.Context, *wrapperspb.StringValue) (
 }
 func (UnimplementedSerfServer) HelloStream(*wrapperspb.StringValue, Serf_HelloStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method HelloStream not implemented")
+}
+func (UnimplementedSerfServer) Query(*emptypb.Empty, Serf_QueryServer) error {
+	return status.Errorf(codes.Unimplemented, "method Query not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
 
@@ -147,6 +185,27 @@ func (x *serfHelloStreamServer) Send(m *wrapperspb.StringValue) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _Serf_Query_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(SerfServer).Query(m, &serfQueryServer{stream})
+}
+
+type Serf_QueryServer interface {
+	Send(*wrapperspb.StringValue) error
+	grpc.ServerStream
+}
+
+type serfQueryServer struct {
+	grpc.ServerStream
+}
+
+func (x *serfQueryServer) Send(m *wrapperspb.StringValue) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // Serf_ServiceDesc is the grpc.ServiceDesc for Serf service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -163,6 +222,11 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "helloStream",
 			Handler:       _Serf_HelloStream_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "query",
+			Handler:       _Serf_Query_Handler,
 			ServerStreams: true,
 		},
 	},
