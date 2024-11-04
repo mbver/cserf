@@ -2,13 +2,16 @@ syntax = "proto3";
 
 option go_package = "rpc/pb";
 
-import "google/protobuf/wrappers.proto";
-import "google/protobuf/empty.proto";
-
 package pb;
 
+message StringValue {
+    string value = 1;
+}
+
+message Empty {}
+
 service Serf{
-    rpc hello(google.protobuf.StringValue) returns (google.protobuf.StringValue);
-    rpc helloStream(google.protobuf.StringValue) returns (stream google.protobuf.StringValue);
-    rpc query(google.protobuf.Empty) returns (stream google.protobuf.StringValue);
+    rpc hello(StringValue) returns (StringValue);
+    rpc helloStream(StringValue) returns (stream StringValue);
+    rpc query(Empty) returns (stream StringValue);
 }

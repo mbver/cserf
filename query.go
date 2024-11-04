@@ -43,6 +43,7 @@ func newQueryManager(logger *log.Logger) *QueryManager {
 func (m *QueryManager) setResponseHandler(id string, ch chan string, timeout time.Duration) {
 	time.AfterFunc(timeout, func() {
 		m.l.Lock()
+		close(m.handlers[id].respCh)
 		delete(m.handlers, id)
 		m.l.Unlock()
 	})
@@ -76,6 +77,6 @@ func (s *Serf) Query(res chan string) error {
 		SourcePort: port,
 	}
 	s.handleQuery(&q)
-	s.query.setResponseHandler(q.ID, res, 3*time.Second) // TODO: have it as input or config value
+	s.query.setResponseHandler(q.ID, res, 2*time.Second) // TODO: have it as input or config value
 	return nil
 }

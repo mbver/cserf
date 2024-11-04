@@ -1,0 +1,97 @@
+package rpc
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	serf "github.com/mbver/cserf"
+	memberlist "github.com/mbver/mlist"
+	"github.com/mbver/mlist/testaddr"
+)
+
+func retry(times int, fn func() (bool, string)) (success bool, msg string) {
+	for i := 0; i < times; i++ {
+		success, msg = fn()
+		if success {
+			return
+		}
+	}
+	return
+}
+
+func testMemberlistConfig() *memberlist.Config {
+	conf := memberlist.DefaultLANConfig()
+	conf.ProbeInterval = 0
+	conf.GossipInterval = 5 * time.Millisecond
+	conf.PushPullInterval = 0
+	conf.ReapInterval = 0
+	return conf
+}
+
+func combineCleanup(cleanups ...func()) func() {
+	return func() {
+		for _, f := range cleanups {
+			f()
+		}
+	}
+}
+
+func testNode() (*serf.Serf, func(), error) {
+	b := &serf.SerfBuilder{}
+	cleanup := func() {}
+
+	key := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	keyRing, err := memberlist.NewKeyring(nil, key)
+	if err != nil {
+		return nil, cleanup, err
+	}
+	b.WithKeyring(keyRing)
+
+	ip, cleanup := testaddr.BindAddrs.NextAvailAddr()
+	mconf := testMemberlistConfig()
+	mconf.BindAddr = ip.String()
+	mconf.Label = "label"
+	b.WithMemberlistConfig(mconf)
+
+	conf := &serf.Config{} // fill in later
+	b.WithConfig(conf)
+
+	prefix := fmt.Sprintf("serf-%s: ", mconf.BindAddr)
+	logger := log.New(os.Stderr, prefix, log.LstdFlags)
+	b.WithLogger(logger)
+
+	s, err := b.Build()
+	if err != nil {
+		return nil, cleanup, err
+	}
+	cleanup1 := combineCleanup(s.Shutdown, cleanup)
+	return s, cleanup1, nil
+}
+
+func twoNodes() (*serf.Serf, *serf.Serf, func(), error) {
+	s1, cleanup1, err := testNode()
+	if err != nil {
+		return nil, nil, cleanup1, err
+	}
+	s2, cleanup2, err := testNode()
+	cleanup := combineCleanup(cleanup1, cleanup2)
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	return s1, s2, cleanup, err
+}
+
+func threeNodes() (*serf.Serf, *serf.Serf, *serf.Serf, func(), error) {
+	s1, s2, cleanup1, err := twoNodes()
+	if err != nil {
+		return nil, nil, nil, cleanup1, err
+	}
+	s3, cleanup2, err := testNode()
+	cleanup := combineCleanup(cleanup1, cleanup2)
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+	return s1, s2, s3, cleanup, err
+}

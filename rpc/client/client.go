@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/mbver/cserf/rpc/pb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -35,7 +34,7 @@ func (c *Client) Close() {
 func (c *Client) Hello(name string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := c.client.Hello(ctx, &wrappers.StringValue{Value: name})
+	res, err := c.client.Hello(ctx, &pb.StringValue{Value: name})
 	if err != nil {
 		return "", err
 	}
@@ -45,7 +44,26 @@ func (c *Client) Hello(name string) (string, error) {
 func (c *Client) HelloStream(name string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	stream, err := c.client.HelloStream(ctx, &wrappers.StringValue{Value: name})
+	stream, err := c.client.HelloStream(ctx, &pb.StringValue{Value: name})
+	if err != nil {
+		return "", err
+	}
+	buf := strings.Builder{}
+
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		buf.WriteString(res.Value)
+	}
+	return buf.String(), nil
+}
+
+func (c *Client) Query() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	stream, err := c.client.Query(ctx, &pb.Empty{})
 	if err != nil {
 		return "", err
 	}

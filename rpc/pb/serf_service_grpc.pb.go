@@ -11,8 +11,6 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -24,9 +22,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SerfClient interface {
-	Hello(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (*wrapperspb.StringValue, error)
-	HelloStream(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error)
-	Query(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Serf_QueryClient, error)
+	Hello(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (*StringValue, error)
+	HelloStream(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error)
+	Query(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Serf_QueryClient, error)
 }
 
 type serfClient struct {
@@ -37,8 +35,8 @@ func NewSerfClient(cc grpc.ClientConnInterface) SerfClient {
 	return &serfClient{cc}
 }
 
-func (c *serfClient) Hello(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (*wrapperspb.StringValue, error) {
-	out := new(wrapperspb.StringValue)
+func (c *serfClient) Hello(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (*StringValue, error) {
+	out := new(StringValue)
 	err := c.cc.Invoke(ctx, "/pb.Serf/hello", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -46,7 +44,7 @@ func (c *serfClient) Hello(ctx context.Context, in *wrapperspb.StringValue, opts
 	return out, nil
 }
 
-func (c *serfClient) HelloStream(ctx context.Context, in *wrapperspb.StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error) {
+func (c *serfClient) HelloStream(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Serf_ServiceDesc.Streams[0], "/pb.Serf/helloStream", opts...)
 	if err != nil {
 		return nil, err
@@ -62,7 +60,7 @@ func (c *serfClient) HelloStream(ctx context.Context, in *wrapperspb.StringValue
 }
 
 type Serf_HelloStreamClient interface {
-	Recv() (*wrapperspb.StringValue, error)
+	Recv() (*StringValue, error)
 	grpc.ClientStream
 }
 
@@ -70,15 +68,15 @@ type serfHelloStreamClient struct {
 	grpc.ClientStream
 }
 
-func (x *serfHelloStreamClient) Recv() (*wrapperspb.StringValue, error) {
-	m := new(wrapperspb.StringValue)
+func (x *serfHelloStreamClient) Recv() (*StringValue, error) {
+	m := new(StringValue)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *serfClient) Query(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Serf_QueryClient, error) {
+func (c *serfClient) Query(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Serf_QueryClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Serf_ServiceDesc.Streams[1], "/pb.Serf/query", opts...)
 	if err != nil {
 		return nil, err
@@ -94,7 +92,7 @@ func (c *serfClient) Query(ctx context.Context, in *emptypb.Empty, opts ...grpc.
 }
 
 type Serf_QueryClient interface {
-	Recv() (*wrapperspb.StringValue, error)
+	Recv() (*StringValue, error)
 	grpc.ClientStream
 }
 
@@ -102,8 +100,8 @@ type serfQueryClient struct {
 	grpc.ClientStream
 }
 
-func (x *serfQueryClient) Recv() (*wrapperspb.StringValue, error) {
-	m := new(wrapperspb.StringValue)
+func (x *serfQueryClient) Recv() (*StringValue, error) {
+	m := new(StringValue)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -114,9 +112,9 @@ func (x *serfQueryClient) Recv() (*wrapperspb.StringValue, error) {
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
 type SerfServer interface {
-	Hello(context.Context, *wrapperspb.StringValue) (*wrapperspb.StringValue, error)
-	HelloStream(*wrapperspb.StringValue, Serf_HelloStreamServer) error
-	Query(*emptypb.Empty, Serf_QueryServer) error
+	Hello(context.Context, *StringValue) (*StringValue, error)
+	HelloStream(*StringValue, Serf_HelloStreamServer) error
+	Query(*Empty, Serf_QueryServer) error
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -124,13 +122,13 @@ type SerfServer interface {
 type UnimplementedSerfServer struct {
 }
 
-func (UnimplementedSerfServer) Hello(context.Context, *wrapperspb.StringValue) (*wrapperspb.StringValue, error) {
+func (UnimplementedSerfServer) Hello(context.Context, *StringValue) (*StringValue, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Hello not implemented")
 }
-func (UnimplementedSerfServer) HelloStream(*wrapperspb.StringValue, Serf_HelloStreamServer) error {
+func (UnimplementedSerfServer) HelloStream(*StringValue, Serf_HelloStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method HelloStream not implemented")
 }
-func (UnimplementedSerfServer) Query(*emptypb.Empty, Serf_QueryServer) error {
+func (UnimplementedSerfServer) Query(*Empty, Serf_QueryServer) error {
 	return status.Errorf(codes.Unimplemented, "method Query not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
@@ -147,7 +145,7 @@ func RegisterSerfServer(s grpc.ServiceRegistrar, srv SerfServer) {
 }
 
 func _Serf_Hello_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(wrapperspb.StringValue)
+	in := new(StringValue)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -159,13 +157,13 @@ func _Serf_Hello_Handler(srv interface{}, ctx context.Context, dec func(interfac
 		FullMethod: "/pb.Serf/hello",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SerfServer).Hello(ctx, req.(*wrapperspb.StringValue))
+		return srv.(SerfServer).Hello(ctx, req.(*StringValue))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Serf_HelloStream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(wrapperspb.StringValue)
+	m := new(StringValue)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -173,7 +171,7 @@ func _Serf_HelloStream_Handler(srv interface{}, stream grpc.ServerStream) error 
 }
 
 type Serf_HelloStreamServer interface {
-	Send(*wrapperspb.StringValue) error
+	Send(*StringValue) error
 	grpc.ServerStream
 }
 
@@ -181,12 +179,12 @@ type serfHelloStreamServer struct {
 	grpc.ServerStream
 }
 
-func (x *serfHelloStreamServer) Send(m *wrapperspb.StringValue) error {
+func (x *serfHelloStreamServer) Send(m *StringValue) error {
 	return x.ServerStream.SendMsg(m)
 }
 
 func _Serf_Query_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(emptypb.Empty)
+	m := new(Empty)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -194,7 +192,7 @@ func _Serf_Query_Handler(srv interface{}, stream grpc.ServerStream) error {
 }
 
 type Serf_QueryServer interface {
-	Send(*wrapperspb.StringValue) error
+	Send(*StringValue) error
 	grpc.ServerStream
 }
 
@@ -202,7 +200,7 @@ type serfQueryServer struct {
 	grpc.ServerStream
 }
 
-func (x *serfQueryServer) Send(m *wrapperspb.StringValue) error {
+func (x *serfQueryServer) Send(m *StringValue) error {
 	return x.ServerStream.SendMsg(m)
 }
 

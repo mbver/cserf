@@ -101,7 +101,7 @@ func TestRPC_MismatchedCerts(t *testing.T) {
 		Certificates: []tls.Certificate{serverCert},
 	})
 
-	s, err := server.CreateServer(addr, creds)
+	s, err := server.CreateServer(addr, creds, nil)
 	require.Nil(t, err)
 	defer s.Stop()
 
@@ -139,7 +139,7 @@ func TestRPC_Hello(t *testing.T) {
 		Certificates: []tls.Certificate{servertCert},
 	})
 
-	s, err := server.CreateServer(addr, creds)
+	s, err := server.CreateServer(addr, creds, nil)
 	require.Nil(t, err)
 	defer s.Stop()
 
@@ -164,4 +164,54 @@ func TestRPC_Hello(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		require.Contains(t, res, fmt.Sprintf("world%d", i))
 	}
+}
+
+func TestRPC_Query(t *testing.T) {
+	s1, s2, s3, cleanup, err := threeNodes()
+	defer cleanup()
+	require.Nil(t, err)
+
+	addr2, err := s2.AdvertiseAddress()
+	require.Nil(t, err)
+
+	addr3, err := s3.AdvertiseAddress()
+	require.Nil(t, err)
+
+	n, err := s1.Join([]string{addr2, addr3})
+	require.Nil(t, err)
+	require.Equal(t, 2, n)
+
+	addr := "localhost:50051"
+	certFile, keyFile, cleanup, err := generateSelfSignedCert()
+	defer cleanup()
+	require.Nil(t, err)
+
+	servertCert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	require.Nil(t, err)
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{servertCert},
+	})
+
+	s, err := server.CreateServer(addr, creds, s1)
+	require.Nil(t, err)
+	defer s.Stop()
+
+	caCert, err := os.ReadFile(certFile)
+	require.Nil(t, err)
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCert)
+	creds = credentials.NewTLS(&tls.Config{
+		RootCAs: certPool,
+	})
+
+	c, err := client.CreateClient(addr, creds)
+	require.Nil(t, err)
+	defer c.Close()
+
+	res, err := c.Query()
+	require.Nil(t, err)
+
+	require.Contains(t, res, s1.ID())
+	require.Contains(t, res, s2.ID())
+	require.Contains(t, res, s3.ID())
 }
