@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync/atomic"
 	"time"
 
 	serf "github.com/mbver/cserf"
@@ -94,4 +95,10 @@ func threeNodes() (*serf.Serf, *serf.Serf, *serf.Serf, func(), error) {
 		return nil, nil, nil, cleanup, err
 	}
 	return s1, s2, s3, cleanup, err
+}
+
+var rpcPort uint32 = 50050
+
+func nextRpcPort() uint32 {
+	return atomic.AddUint32(&rpcPort, 1)
 }

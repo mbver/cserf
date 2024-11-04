@@ -15,9 +15,11 @@ import (
 	"testing"
 	"time"
 
+	serf "github.com/mbver/cserf"
 	"github.com/mbver/cserf/rpc/client"
 	"github.com/mbver/cserf/rpc/server"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -88,78 +90,92 @@ func generateSelfSignedCert() (string, string, func(), error) {
 	return certFile, keyFile, cleanup, nil
 }
 
-func TestRPC_MismatchedCerts(t *testing.T) {
-	addr := "localhost:50051"
-	certFile1, keyfile1, cleanup1, err := generateSelfSignedCert()
-	defer cleanup1()
-	require.Nil(t, err)
+var cert1, key1, cert2, key2 string
 
-	serverCert, err := tls.LoadX509KeyPair(certFile1, keyfile1)
-	require.Nil(t, err)
+func TestMain(m *testing.M) {
+	var err error
+	var cleanup1, cleanup2 func()
+
+	cert1, key1, cleanup1, err = generateSelfSignedCert()
+	defer cleanup1()
+	if err != nil {
+		panic(err)
+	}
+
+	cert2, key2, cleanup2, err = generateSelfSignedCert()
+	defer cleanup2()
+	if err != nil {
+		panic(err)
+	}
+
+	m.Run()
+}
+
+func prepareRPCServer(addr string, cert, key string, serf *serf.Serf) (*grpc.Server, error) {
+	serverCert, err := tls.LoadX509KeyPair(cert, key)
+	if err != nil {
+		return nil, err
+	}
 
 	creds := credentials.NewTLS(&tls.Config{
 		Certificates: []tls.Certificate{serverCert},
 	})
+	s, err := server.CreateServer(addr, creds, serf)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
 
-	s, err := server.CreateServer(addr, creds, nil)
-	require.Nil(t, err)
-	defer s.Stop()
-
-	certFile2, _, cleanup2, err := generateSelfSignedCert()
-	defer cleanup2()
-	require.Nil(t, err)
-
-	caCert, err := os.ReadFile(certFile2)
-	require.Nil(t, err)
-
+func prepareRPCClient(addr string, cert string) (*client.Client, error) {
+	caCert, err := os.ReadFile(cert)
+	if err != nil {
+		return nil, err
+	}
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(caCert)
-
-	creds = credentials.NewTLS(&tls.Config{
+	creds := credentials.NewTLS(&tls.Config{
 		RootCAs: certPool,
 	})
-
 	c, err := client.CreateClient(addr, creds)
-	require.Nil(t, err)
-	defer c.Close()
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
 
-	_, err = c.Hello("world")
+func TestRPC_MismatchedCerts(t *testing.T) {
+	addr := fmt.Sprintf("localhost:%d", nextRpcPort())
+
+	server, err := prepareRPCServer(addr, cert1, key1, nil)
+	require.Nil(t, err)
+	defer server.Stop()
+
+	client, err := prepareRPCClient(addr, cert2)
+	require.Nil(t, err)
+	defer client.Close()
+
+	_, err = client.Hello("world")
 	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "connection refused")
 }
 
 func TestRPC_Hello(t *testing.T) {
-	addr := "localhost:50051"
-	certFile, keyFile, cleanup, err := generateSelfSignedCert()
-	defer cleanup()
-	require.Nil(t, err)
+	addr := fmt.Sprintf("localhost:%d", nextRpcPort())
 
-	servertCert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	server, err := prepareRPCServer(addr, cert1, key1, nil)
 	require.Nil(t, err)
-	creds := credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{servertCert},
-	})
+	defer server.Stop()
 
-	s, err := server.CreateServer(addr, creds, nil)
+	client, err := prepareRPCClient(addr, cert1)
 	require.Nil(t, err)
-	defer s.Stop()
+	defer client.Close()
 
-	caCert, err := os.ReadFile(certFile)
-	require.Nil(t, err)
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(caCert)
-	creds = credentials.NewTLS(&tls.Config{
-		RootCAs: certPool,
-	})
-
-	c, err := client.CreateClient(addr, creds)
-	require.Nil(t, err)
-	defer c.Close()
-
-	res, err := c.Hello("world")
+	res, err := client.Hello("world")
 	require.Nil(t, err)
 	require.Contains(t, res, "world")
 
-	res, err = c.HelloStream("world")
+	res, err = client.HelloStream("world")
 	require.Nil(t, err)
 	for i := 0; i < 3; i++ {
 		require.Contains(t, res, fmt.Sprintf("world%d", i))
@@ -181,34 +197,17 @@ func TestRPC_Query(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 2, n)
 
-	addr := "localhost:50051"
-	certFile, keyFile, cleanup, err := generateSelfSignedCert()
-	defer cleanup()
-	require.Nil(t, err)
+	addr := fmt.Sprintf("localhost:%d", nextRpcPort())
 
-	servertCert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	server, err := prepareRPCServer(addr, cert1, key1, s1)
 	require.Nil(t, err)
-	creds := credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{servertCert},
-	})
+	defer server.Stop()
 
-	s, err := server.CreateServer(addr, creds, s1)
+	client, err := prepareRPCClient(addr, cert1)
 	require.Nil(t, err)
-	defer s.Stop()
+	defer client.Close()
 
-	caCert, err := os.ReadFile(certFile)
-	require.Nil(t, err)
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(caCert)
-	creds = credentials.NewTLS(&tls.Config{
-		RootCAs: certPool,
-	})
-
-	c, err := client.CreateClient(addr, creds)
-	require.Nil(t, err)
-	defer c.Close()
-
-	res, err := c.Query()
+	res, err := client.Query()
 	require.Nil(t, err)
 
 	require.Contains(t, res, s1.ID())
