@@ -1,3 +1,5 @@
 package serf
 
-type Config struct{} // TODO: broadcast timeout should inject to memberlist config
+type Config struct {
+	QueryBufferSize int
+} // TODO: broadcast timeout should inject to memberlist config

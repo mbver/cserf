@@ -67,11 +67,13 @@ func (s *Serf) handleMsg(msg []byte) {
 }
 
 func (s *Serf) handleQuery(q *msgQuery) {
-	if s.query.processed[q.ID] {
+	s.query.clock.Witness(q.LTime)
+
+	if !s.query.addToBuffer(q) {
 		return
 	}
+
 	s.broadcasts.broadcastQuery(msgQueryType, *q, nil)
-	s.query.processed[q.ID] = true
 	resp := msgQueryResponse{
 		ID:   q.ID,
 		From: s.mlist.ID(),

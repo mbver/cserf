@@ -4,19 +4,33 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 )
 
 type msgQuery struct {
-	ID         string
+	LTime      LamportTime
+	ID         uint32
 	SourceIP   net.IP
 	SourcePort uint16
 }
 
+type bufQuery struct {
+	ltime LamportTime
+	id    uint32
+}
+
+func (b *bufQuery) LTime() LamportTime {
+	return b.ltime
+}
+
+func (b *bufQuery) Equal(item lItem) bool {
+	b1 := item.(*bufQuery)
+	return b1.id == b.id
+}
+
 type msgQueryResponse struct {
-	ID   string
+	ID   uint32
 	From string
 }
 
@@ -26,21 +40,23 @@ type QueryResponseHandler struct {
 }
 
 type QueryManager struct {
-	l         sync.Mutex
-	handlers  map[string]*QueryResponseHandler
-	logger    *log.Logger
-	processed map[string]bool // TODO: for not rebroadcast already handle query msg. later will use buffer
+	l        sync.Mutex
+	clock    *LamportClock
+	buffers  lBuffer
+	handlers map[uint32]*QueryResponseHandler
+	logger   *log.Logger
 }
 
-func newQueryManager(logger *log.Logger) *QueryManager {
+func newQueryManager(logger *log.Logger, bufferSize int) *QueryManager {
 	return &QueryManager{
-		handlers:  make(map[string]*QueryResponseHandler),
-		logger:    logger,
-		processed: make(map[string]bool),
+		clock:    &LamportClock{},
+		buffers:  make([]*lGroupItem, bufferSize),
+		handlers: make(map[uint32]*QueryResponseHandler),
+		logger:   logger,
 	}
 }
 
-func (m *QueryManager) setResponseHandler(id string, ch chan string, timeout time.Duration) {
+func (m *QueryManager) setResponseHandler(id uint32, ch chan string, timeout time.Duration) {
 	time.AfterFunc(timeout, func() {
 		m.l.Lock()
 		close(m.handlers[id].respCh)
@@ -66,13 +82,37 @@ func (m *QueryManager) invokeResponseHandler(r *msgQueryResponse) {
 	}
 }
 
+// lock here or lock outside?
+func (m *QueryManager) addToBuffer(msg *msgQuery) (success bool) {
+	m.l.Lock()
+	defer m.l.Unlock()
+	b := &bufQuery{msg.LTime, msg.ID}
+	if m.buffers.isTooOld(m.clock.Time(), b) {
+		return false
+	}
+	if m.buffers.isLTimeNew(b.LTime()) {
+		m.buffers.addNewLTime(b)
+		return true
+	}
+	idx := b.LTime() % m.buffers.len()
+	group := m.buffers[idx]
+	if group.has(b) {
+		return false
+	}
+	group.add(b)
+	return true
+}
+
 func (s *Serf) Query(res chan string) error {
 	addr, port, err := s.mlist.GetAdvertiseAddr()
 	if err != nil {
 		return err
 	}
+	lTime := s.query.clock.Time()
+	s.query.clock.Next()
 	q := msgQuery{
-		ID:         strconv.Itoa(int(rand.Int31())),
+		LTime:      lTime,
+		ID:         uint32(rand.Int31()),
 		SourceIP:   addr,
 		SourcePort: port,
 	}

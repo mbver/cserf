@@ -56,7 +56,9 @@ func testNode() (*serf.Serf, func(), error) {
 	mconf.Label = "label"
 	b.WithMemberlistConfig(mconf)
 
-	conf := &serf.Config{} // fill in later
+	conf := &serf.Config{
+		QueryBufferSize: 1024,
+	} // fill in later
 	b.WithConfig(conf)
 
 	prefix := fmt.Sprintf("serf-%s: ", mconf.BindAddr)

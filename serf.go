@@ -53,7 +53,6 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	broadcasts := newBroadcastManager(s.NumNodes, b.mconf.RetransmitMult) // TODO: add a logger then?
 	s.broadcasts = broadcasts
 	mbuilder.WithUserBroadcasts(broadcasts)
-
 	m, err := mbuilder.Build()
 	if err != nil {
 		return nil, err
@@ -61,7 +60,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.mlist = m
 
 	s.logger = b.logger
-	s.query = newQueryManager(b.logger)
+	s.query = newQueryManager(b.logger, b.conf.QueryBufferSize)
 	s.shutdownCh = make(chan struct{})
 
 	go s.receiveMsgs()
