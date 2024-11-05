@@ -48,3 +48,70 @@ func TestSerf_Query(t *testing.T) {
 	})
 	require.True(t, success, msg)
 }
+
+func TestSerf_IsQueryAccepted(t *testing.T) {
+	tags := map[string]string{
+		"role":       "webserver",
+		"datacenter": "east-aws",
+	}
+	s, cleanup, err := testNode(tags)
+	defer cleanup()
+	require.Nil(t, err)
+
+	cases := []struct {
+		nodes      []string
+		filtertags []filterTag
+		accepted   bool
+	}{
+		{
+			nodes: []string{"foo", "bar", s.ID()},
+			filtertags: []filterTag{
+				{"role", "^web"},
+				{"datacenter", "aws$"},
+			},
+			accepted: true,
+		},
+		{
+			nodes: []string{"foo", "bar"},
+			filtertags: []filterTag{
+				{"role", "^web"},
+				{"datacenter", "aws$"},
+			},
+			accepted: false,
+		},
+		{
+			filtertags: []filterTag{
+				{"role", "^web"},
+				{"datacenter", "aws$"},
+			},
+			accepted: true,
+		},
+		{
+			nodes:    []string{"foo", "bar"},
+			accepted: false,
+		},
+		{
+			filtertags: []filterTag{
+				{"other", "cool"},
+			},
+			accepted: false,
+		},
+		{
+			filtertags: []filterTag{
+				{"role", "db"},
+			},
+			accepted: false,
+		},
+	}
+
+	for _, c := range cases {
+		q := &msgQuery{
+			ForNodes:   c.nodes,
+			FilterTags: c.filtertags,
+		}
+		accepted := s.isQueryAccepted(q)
+		if accepted != c.accepted {
+			t.Errorf("result for %+v not matched. expect %t, got %t", q, c.accepted, accepted)
+		}
+	}
+}

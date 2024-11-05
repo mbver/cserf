@@ -29,7 +29,7 @@ func combineCleanup(cleanups ...func()) func() {
 	}
 }
 
-func testNode() (*Serf, func(), error) {
+func testNode(tags map[string]string) (*Serf, func(), error) {
 	b := &SerfBuilder{}
 	cleanup := func() {}
 
@@ -55,6 +55,8 @@ func testNode() (*Serf, func(), error) {
 	logger := log.New(os.Stderr, prefix, log.LstdFlags)
 	b.WithLogger(logger)
 
+	b.WithTags(tags)
+
 	s, err := b.Build()
 	if err != nil {
 		return nil, cleanup, err
@@ -64,11 +66,11 @@ func testNode() (*Serf, func(), error) {
 }
 
 func twoNodes() (*Serf, *Serf, func(), error) {
-	s1, cleanup1, err := testNode()
+	s1, cleanup1, err := testNode(nil)
 	if err != nil {
 		return nil, nil, cleanup1, err
 	}
-	s2, cleanup2, err := testNode()
+	s2, cleanup2, err := testNode(nil)
 	cleanup := combineCleanup(cleanup1, cleanup2)
 	if err != nil {
 		return nil, nil, cleanup, err
@@ -81,7 +83,7 @@ func threeNodes() (*Serf, *Serf, *Serf, func(), error) {
 	if err != nil {
 		return nil, nil, nil, cleanup1, err
 	}
-	s3, cleanup2, err := testNode()
+	s3, cleanup2, err := testNode(nil)
 	cleanup := combineCleanup(cleanup1, cleanup2)
 	if err != nil {
 		return nil, nil, nil, cleanup, err
@@ -90,7 +92,7 @@ func threeNodes() (*Serf, *Serf, *Serf, func(), error) {
 }
 
 func TestSerf_Create(t *testing.T) {
-	_, cleanup, err := testNode()
+	_, cleanup, err := testNode(nil)
 	defer cleanup()
 	require.Nil(t, err)
 }
