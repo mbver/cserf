@@ -8,11 +8,18 @@ import (
 	"time"
 )
 
+type filterTag struct {
+	Name string
+	Expr string
+}
+
 type msgQuery struct {
 	LTime      LamportTime
 	ID         uint32
 	SourceIP   net.IP
 	SourcePort uint16
+	ForNodes   []string    `codec:",omitempty"`
+	FilterTags []filterTag `codec:",omitempty"`
 }
 
 type bufQuery struct {

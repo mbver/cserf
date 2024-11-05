@@ -7,6 +7,8 @@ import (
 	memberlist "github.com/mbver/mlist"
 )
 
+const tagMagicByte msgType = 255
+
 type Serf struct {
 	mlist      *memberlist.Memberlist
 	broadcasts *broadcastManager
@@ -14,6 +16,7 @@ type Serf struct {
 	userMsgCh  chan []byte
 	logger     *log.Logger
 	shutdownCh chan struct{}
+	tags       map[string]string
 }
 
 type SerfBuilder struct {
@@ -21,6 +24,7 @@ type SerfBuilder struct {
 	conf    *Config
 	keyring *memberlist.Keyring
 	logger  *log.Logger
+	tags    map[string]string
 }
 
 func (b *SerfBuilder) WithMemberlistConfig(conf *memberlist.Config) {
@@ -39,6 +43,10 @@ func (b *SerfBuilder) WithLogger(l *log.Logger) {
 	b.logger = l
 }
 
+func (b *SerfBuilder) WithTags(tags map[string]string) {
+	b.tags = tags
+}
+
 func (b *SerfBuilder) Build() (*Serf, error) {
 	s := &Serf{}
 	mbuilder := &memberlist.MemberlistBuilder{}
@@ -53,6 +61,17 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	broadcasts := newBroadcastManager(s.NumNodes, b.mconf.RetransmitMult) // TODO: add a logger then?
 	s.broadcasts = broadcasts
 	mbuilder.WithUserBroadcasts(broadcasts)
+
+	s.tags = make(map[string]string)
+	if len(b.tags) != 0 {
+		encoded, err := encodeTags(s.tags)
+		if err != nil {
+			return nil, err
+		}
+		b.mconf.Tags = encoded
+		s.tags = b.tags
+	}
+
 	m, err := mbuilder.Build()
 	if err != nil {
 		return nil, err

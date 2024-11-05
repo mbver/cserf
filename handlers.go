@@ -2,6 +2,7 @@ package serf
 
 import (
 	"net"
+	"regexp"
 )
 
 type msgType uint8
@@ -74,6 +75,12 @@ func (s *Serf) handleQuery(q *msgQuery) {
 	}
 
 	s.broadcasts.broadcastQuery(msgQueryType, *q, nil)
+
+	if !s.isQueryAccepted(q) {
+		return
+	}
+
+	// TODO: this will be removed because it the QueryEvent will do the respond further down the pipeline
 	resp := msgQueryResponse{
 		ID:   q.ID,
 		From: s.mlist.ID(),
@@ -90,6 +97,26 @@ func (s *Serf) handleQuery(q *msgQuery) {
 	if err != nil {
 		s.logger.Printf("[ERR] serf: failed to send query response to %s", addr.String())
 	}
+}
+
+func (s *Serf) isQueryAccepted(q *msgQuery) bool {
+	if len(q.ForNodes) != 0 {
+		for _, id := range q.ForNodes {
+			if id == s.ID() {
+				return true
+			}
+		}
+		return false
+	}
+	if len(q.FilterTags) != 0 {
+		for _, f := range q.FilterTags {
+			matched, err := regexp.MatchString(f.Expr, s.tags[f.Name])
+			if err != nil || !matched {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (s *Serf) handleQueryResponse(r *msgQueryResponse) {
