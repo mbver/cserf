@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 option go_package = "rpc/pb";
+import "google/protobuf/duration.proto";
 
 package pb;
 
@@ -10,8 +11,19 @@ message StringValue {
 
 message Empty {}
 
+message QueryParam{
+    repeated string for_nodes = 1;
+    repeated FilterTag filter_tags = 2;
+    google.protobuf.Duration timeout = 3;
+}
+
+message FilterTag {
+    string name = 1;
+    string expr = 2;
+}
+
 service Serf{
     rpc hello(StringValue) returns (StringValue);
     rpc helloStream(StringValue) returns (stream StringValue);
-    rpc query(Empty) returns (stream StringValue);
+    rpc query(QueryParam) returns (stream StringValue);
 }

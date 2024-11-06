@@ -47,7 +47,8 @@ func testNode(tags map[string]string) (*Serf, func(), error) {
 	b.WithMemberlistConfig(mconf)
 
 	conf := &Config{
-		QueryBufferSize: 1024,
+		QueryBufferSize:  1024,
+		QueryTimeoutMult: 16,
 	} // fill in later
 	b.WithConfig(conf)
 

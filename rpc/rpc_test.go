@@ -207,7 +207,7 @@ func TestRPC_Query(t *testing.T) {
 	require.Nil(t, err)
 	defer client.Close()
 
-	res, err := client.Query()
+	res, err := client.Query(nil)
 	require.Nil(t, err)
 
 	require.Contains(t, res, s1.ID())

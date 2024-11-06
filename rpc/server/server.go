@@ -51,9 +51,27 @@ func (s *Server) HelloStream(name *pb.StringValue, stream pb.Serf_HelloStreamSer
 	return nil
 }
 
-func (s *Server) Query(e *pb.Empty, stream pb.Serf_QueryServer) error {
+func QueryParamFromPb(params *pb.QueryParam) *serf.QueryParam {
+	var res = &serf.QueryParam{}
+	res.ForNodes = params.ForNodes
+	for _, tag := range params.FilterTags {
+		f := serf.FilterTag{
+			Name: tag.Name,
+			Expr: tag.Expr,
+		}
+		res.FilterTags = append(res.FilterTags, f)
+	}
+	res.Timeout = params.Timeout.AsDuration()
+	return res
+}
+
+func (s *Server) Query(params *pb.QueryParam, stream pb.Serf_QueryServer) error {
+	var p *serf.QueryParam
+	if params != nil {
+		p = QueryParamFromPb(params)
+	}
 	respCh := make(chan string)
-	s.serf.Query(respCh)
+	s.serf.Query(respCh, p)
 	for res := range respCh {
 		stream.Send(&pb.StringValue{
 			Value: res,

@@ -2,13 +2,20 @@ package serf
 
 import (
 	"log"
+	"math"
 	"math/rand"
 	"net"
 	"sync"
 	"time"
 )
 
-type filterTag struct {
+type QueryParam struct {
+	ForNodes   []string
+	FilterTags []FilterTag
+	Timeout    time.Duration
+}
+
+type FilterTag struct {
 	Name string
 	Expr string
 }
@@ -19,7 +26,7 @@ type msgQuery struct {
 	SourceIP   net.IP
 	SourcePort uint16
 	ForNodes   []string    `codec:",omitempty"`
-	FilterTags []filterTag `codec:",omitempty"`
+	FilterTags []FilterTag `codec:",omitempty"`
 }
 
 type bufQuery struct {
@@ -47,7 +54,7 @@ type QueryResponseHandler struct {
 }
 
 type QueryManager struct {
-	l        sync.Mutex
+	l        sync.RWMutex
 	clock    *LamportClock
 	buffers  lBuffer
 	handlers map[uint32]*QueryResponseHandler
@@ -76,15 +83,15 @@ func (m *QueryManager) setResponseHandler(id uint32, ch chan string, timeout tim
 }
 
 func (m *QueryManager) invokeResponseHandler(r *msgQueryResponse) {
-	m.l.Lock()
+	m.l.RLock()
+	defer m.l.RUnlock() // wait until sending done or it will panic for sending to closed channel
 	h, ok := m.handlers[r.ID]
-	m.l.Unlock()
 	if !ok {
 		return
 	}
 	select {
 	case h.respCh <- r.From:
-	case <-time.After(2 * time.Second): // TODO: have a fixed value in config
+	case <-time.After(5 * time.Millisecond): // TODO: have a fixed value in config
 		m.logger.Printf("[ERR] serf query: timeout streaming response from %s", r.From)
 	}
 }
@@ -96,10 +103,17 @@ func (m *QueryManager) addToBuffer(msg *msgQuery) (success bool) {
 	return m.buffers.addItem(m.clock.Time(), b)
 }
 
-func (s *Serf) Query(res chan string) error {
+func (s *Serf) Query(res chan string, params *QueryParam) (chan string, error) {
+	if params == nil {
+		params = s.DefaultQueryParams()
+	}
+	if params.Timeout == 0 {
+		params.Timeout = s.DefaultQueryTimeout()
+	}
+
 	addr, port, err := s.mlist.GetAdvertiseAddr()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	lTime := s.query.clock.Time()
 	s.query.clock.Next()
@@ -108,8 +122,24 @@ func (s *Serf) Query(res chan string) error {
 		ID:         uint32(rand.Int31()),
 		SourceIP:   addr,
 		SourcePort: port,
+		ForNodes:   params.ForNodes,
+		FilterTags: params.FilterTags,
 	}
+	s.query.setResponseHandler(q.ID, res, params.Timeout) // TODO: have it as input or config value
 	s.handleQuery(&q)
-	s.query.setResponseHandler(q.ID, res, 2*time.Second) // TODO: have it as input or config value
-	return nil
+	return res, nil
+}
+
+func (s *Serf) DefaultQueryParams() *QueryParam {
+	return &QueryParam{
+		ForNodes:   nil,
+		FilterTags: nil,
+		Timeout:    s.DefaultQueryTimeout(),
+	}
+}
+
+func (s *Serf) DefaultQueryTimeout() time.Duration {
+	n := s.mlist.GetNumNodes()
+	scale := math.Ceil(math.Log10(float64(n)+1)) * float64(s.config.QueryTimeoutMult)
+	return time.Duration(scale) * s.mlist.GossipInterval()
 }

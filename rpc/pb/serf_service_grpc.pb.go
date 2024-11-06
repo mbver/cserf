@@ -24,7 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 type SerfClient interface {
 	Hello(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (*StringValue, error)
 	HelloStream(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error)
-	Query(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Serf_QueryClient, error)
+	Query(ctx context.Context, in *QueryParam, opts ...grpc.CallOption) (Serf_QueryClient, error)
 }
 
 type serfClient struct {
@@ -76,7 +76,7 @@ func (x *serfHelloStreamClient) Recv() (*StringValue, error) {
 	return m, nil
 }
 
-func (c *serfClient) Query(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Serf_QueryClient, error) {
+func (c *serfClient) Query(ctx context.Context, in *QueryParam, opts ...grpc.CallOption) (Serf_QueryClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Serf_ServiceDesc.Streams[1], "/pb.Serf/query", opts...)
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func (x *serfQueryClient) Recv() (*StringValue, error) {
 type SerfServer interface {
 	Hello(context.Context, *StringValue) (*StringValue, error)
 	HelloStream(*StringValue, Serf_HelloStreamServer) error
-	Query(*Empty, Serf_QueryServer) error
+	Query(*QueryParam, Serf_QueryServer) error
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -128,7 +128,7 @@ func (UnimplementedSerfServer) Hello(context.Context, *StringValue) (*StringValu
 func (UnimplementedSerfServer) HelloStream(*StringValue, Serf_HelloStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method HelloStream not implemented")
 }
-func (UnimplementedSerfServer) Query(*Empty, Serf_QueryServer) error {
+func (UnimplementedSerfServer) Query(*QueryParam, Serf_QueryServer) error {
 	return status.Errorf(codes.Unimplemented, "method Query not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
@@ -184,7 +184,7 @@ func (x *serfHelloStreamServer) Send(m *StringValue) error {
 }
 
 func _Serf_Query_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Empty)
+	m := new(QueryParam)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

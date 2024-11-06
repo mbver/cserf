@@ -60,10 +60,10 @@ func (c *Client) HelloStream(name string) (string, error) {
 	return buf.String(), nil
 }
 
-func (c *Client) Query() (string, error) {
+func (c *Client) Query(params *pb.QueryParam) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	stream, err := c.client.Query(ctx, &pb.Empty{})
+	stream, err := c.client.Query(ctx, params)
 	if err != nil {
 		return "", err
 	}

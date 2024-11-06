@@ -7,7 +7,7 @@ toolchain go1.23.2
 require (
 	github.com/golang/protobuf v1.5.2
 	github.com/hashicorp/go-msgpack v0.5.5
-	github.com/mbver/mlist v0.0.0-20241104041047-ca19e61cb51c
+	github.com/mbver/mlist v0.0.0-20241106061835-be7809b99b22
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/grpc v1.67.1
 	google.golang.org/protobuf v1.35.1

@@ -23,7 +23,7 @@ func TestSerf_Query(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 2, n)
 	respCh := make(chan string, 3)
-	s1.Query(respCh)
+	s1.Query(respCh, nil)
 
 	success, msg := retry(5, func() (bool, string) {
 		time.Sleep(10 * time.Millisecond)
@@ -60,12 +60,12 @@ func TestSerf_IsQueryAccepted(t *testing.T) {
 
 	cases := []struct {
 		nodes      []string
-		filtertags []filterTag
+		filtertags []FilterTag
 		accepted   bool
 	}{
 		{
 			nodes: []string{"foo", "bar", s.ID()},
-			filtertags: []filterTag{
+			filtertags: []FilterTag{
 				{"role", "^web"},
 				{"datacenter", "aws$"},
 			},
@@ -73,14 +73,14 @@ func TestSerf_IsQueryAccepted(t *testing.T) {
 		},
 		{
 			nodes: []string{"foo", "bar"},
-			filtertags: []filterTag{
+			filtertags: []FilterTag{
 				{"role", "^web"},
 				{"datacenter", "aws$"},
 			},
 			accepted: false,
 		},
 		{
-			filtertags: []filterTag{
+			filtertags: []FilterTag{
 				{"role", "^web"},
 				{"datacenter", "aws$"},
 			},
@@ -91,13 +91,13 @@ func TestSerf_IsQueryAccepted(t *testing.T) {
 			accepted: false,
 		},
 		{
-			filtertags: []filterTag{
+			filtertags: []FilterTag{
 				{"other", "cool"},
 			},
 			accepted: false,
 		},
 		{
-			filtertags: []filterTag{
+			filtertags: []FilterTag{
 				{"role", "db"},
 			},
 			accepted: false,

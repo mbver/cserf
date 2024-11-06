@@ -10,6 +10,7 @@ import (
 const tagMagicByte msgType = 255
 
 type Serf struct {
+	config     *Config
 	mlist      *memberlist.Memberlist
 	broadcasts *broadcastManager
 	query      *QueryManager
@@ -49,6 +50,7 @@ func (b *SerfBuilder) WithTags(tags map[string]string) {
 
 func (b *SerfBuilder) Build() (*Serf, error) {
 	s := &Serf{}
+	s.config = b.conf
 	mbuilder := &memberlist.MemberlistBuilder{}
 	mbuilder.WithConfig(b.mconf)
 	mbuilder.WithLogger(b.logger)

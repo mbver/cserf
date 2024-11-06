@@ -57,7 +57,8 @@ func testNode() (*serf.Serf, func(), error) {
 	b.WithMemberlistConfig(mconf)
 
 	conf := &serf.Config{
-		QueryBufferSize: 1024,
+		QueryBufferSize:  1024,
+		QueryTimeoutMult: 16,
 	} // fill in later
 	b.WithConfig(conf)
 
