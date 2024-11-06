@@ -82,8 +82,9 @@ func (s *Serf) handleQuery(q *msgQuery) {
 
 	// TODO: this will be removed because it the QueryEvent will do the respond further down the pipeline
 	resp := msgQueryResponse{
-		ID:   q.ID,
-		From: s.mlist.ID(),
+		LTime: q.LTime,
+		ID:    q.ID,
+		From:  s.mlist.ID(),
 	}
 	msg, err := encode(msgQueryRespType, resp)
 	if err != nil {

@@ -44,11 +44,13 @@ func (b *bufQuery) Equal(item lItem) bool {
 }
 
 type msgQueryResponse struct {
-	ID   uint32
-	From string
+	LTime LamportTime
+	ID    uint32
+	From  string
 }
 
 type QueryResponseHandler struct {
+	id     uint32
 	respCh chan string
 	// TODO: have a map to track duplicate responses (for relay, skip for now)
 }
@@ -57,7 +59,7 @@ type QueryManager struct {
 	l        sync.RWMutex
 	clock    *LamportClock
 	buffers  lBuffer
-	handlers map[uint32]*QueryResponseHandler
+	handlers map[LamportTime]*QueryResponseHandler
 	logger   *log.Logger
 }
 
@@ -65,28 +67,31 @@ func newQueryManager(logger *log.Logger, bufferSize int) *QueryManager {
 	return &QueryManager{
 		clock:    &LamportClock{},
 		buffers:  make([]*lGroupItem, bufferSize),
-		handlers: make(map[uint32]*QueryResponseHandler),
+		handlers: make(map[LamportTime]*QueryResponseHandler),
 		logger:   logger,
 	}
 }
 
-func (m *QueryManager) setResponseHandler(id uint32, ch chan string, timeout time.Duration) {
+func (m *QueryManager) setResponseHandler(lTime LamportTime, id uint32, ch chan string, timeout time.Duration) {
 	time.AfterFunc(timeout, func() {
 		m.l.Lock()
-		close(m.handlers[id].respCh)
-		delete(m.handlers, id)
+		close(m.handlers[lTime].respCh)
+		delete(m.handlers, lTime)
 		m.l.Unlock()
 	})
 	m.l.Lock()
-	m.handlers[id] = &QueryResponseHandler{ch}
+	m.handlers[lTime] = &QueryResponseHandler{id, ch}
 	m.l.Unlock()
 }
 
 func (m *QueryManager) invokeResponseHandler(r *msgQueryResponse) {
 	m.l.RLock()
 	defer m.l.RUnlock() // wait until sending done or it will panic for sending to closed channel
-	h, ok := m.handlers[r.ID]
+	h, ok := m.handlers[r.LTime]
 	if !ok {
+		return
+	}
+	if h.id != r.ID {
 		return
 	}
 	select {
@@ -125,7 +130,7 @@ func (s *Serf) Query(res chan string, params *QueryParam) (chan string, error) {
 		ForNodes:   params.ForNodes,
 		FilterTags: params.FilterTags,
 	}
-	s.query.setResponseHandler(q.ID, res, params.Timeout) // TODO: have it as input or config value
+	s.query.setResponseHandler(q.LTime, q.ID, res, params.Timeout) // TODO: have it as input or config value
 	s.handleQuery(&q)
 	return res, nil
 }
