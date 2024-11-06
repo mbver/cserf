@@ -15,6 +15,7 @@ message QueryParam{
     repeated string for_nodes = 1;
     repeated FilterTag filter_tags = 2;
     google.protobuf.Duration timeout = 3;
+    uint32 num_relays = 4;
 }
 
 message FilterTag {

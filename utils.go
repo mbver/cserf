@@ -3,6 +3,7 @@ package serf
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 
 	"github.com/hashicorp/go-msgpack/codec"
 )
@@ -39,4 +40,11 @@ func decodeTags(msg []byte) (map[string]string, error) {
 		return nil, err
 	}
 	return tags, nil
+}
+
+func randIntN(n int) int {
+	if n == 0 { // if n == 0, modulo will panic
+		return 0
+	}
+	return int(rand.Uint32() % uint32(n))
 }

@@ -13,6 +13,7 @@ type QueryParam struct {
 	ForNodes   []string
 	FilterTags []FilterTag
 	Timeout    time.Duration
+	NumRelays  uint8
 }
 
 type FilterTag struct {
@@ -25,8 +26,10 @@ type msgQuery struct {
 	ID         uint32
 	SourceIP   net.IP
 	SourcePort uint16
+	NodeID     string
 	ForNodes   []string    `codec:",omitempty"`
 	FilterTags []FilterTag `codec:",omitempty"`
+	NumRelays  uint8
 }
 
 type bufQuery struct {
@@ -49,10 +52,16 @@ type msgQueryResponse struct {
 	From  string
 }
 
+type msgRelay struct {
+	Msg      []byte
+	DestIP   net.IP
+	DestPort uint16
+}
+
 type QueryResponseHandler struct {
-	id     uint32
-	respCh chan string
-	// TODO: have a map to track duplicate responses (for relay, skip for now)
+	id       uint32
+	respCh   chan string
+	received map[string]struct{} // because handleMsg is sequential, no need to protect received with lock. furthermore, lock on manager is hold during accessing the handler!
 }
 
 type QueryManager struct {
@@ -80,7 +89,11 @@ func (m *QueryManager) setResponseHandler(lTime LamportTime, id uint32, ch chan 
 		m.l.Unlock()
 	})
 	m.l.Lock()
-	m.handlers[lTime] = &QueryResponseHandler{id, ch}
+	m.handlers[lTime] = &QueryResponseHandler{
+		id:       id,
+		respCh:   ch,
+		received: make(map[string]struct{}),
+	}
 	m.l.Unlock()
 }
 
@@ -94,6 +107,10 @@ func (m *QueryManager) invokeResponseHandler(r *msgQueryResponse) {
 	if h.id != r.ID {
 		return
 	}
+	if _, ok := h.received[r.From]; ok {
+		return
+	}
+	h.received[r.From] = struct{}{}
 	select {
 	case h.respCh <- r.From:
 	case <-time.After(5 * time.Millisecond): // TODO: have a fixed value in config
@@ -127,19 +144,24 @@ func (s *Serf) Query(res chan string, params *QueryParam) (chan string, error) {
 		ID:         uint32(rand.Int31()),
 		SourceIP:   addr,
 		SourcePort: port,
+		NodeID:     s.ID(),
 		ForNodes:   params.ForNodes,
 		FilterTags: params.FilterTags,
+		NumRelays:  params.NumRelays,
 	}
 	s.query.setResponseHandler(q.LTime, q.ID, res, params.Timeout) // TODO: have it as input or config value
-	s.handleQuery(&q)
+	// handle query locally
+	msg, err := encode(msgQueryType, q)
+	if err != nil {
+		return nil, err
+	}
+	s.handleQuery(msg)
 	return res, nil
 }
 
 func (s *Serf) DefaultQueryParams() *QueryParam {
 	return &QueryParam{
-		ForNodes:   nil,
-		FilterTags: nil,
-		Timeout:    s.DefaultQueryTimeout(),
+		Timeout: s.DefaultQueryTimeout(),
 	}
 }
 

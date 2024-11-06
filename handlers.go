@@ -3,6 +3,8 @@ package serf
 import (
 	"net"
 	"regexp"
+
+	memberlist "github.com/mbver/mlist"
 )
 
 type msgType uint8
@@ -10,6 +12,7 @@ type msgType uint8
 const (
 	msgQueryType msgType = iota
 	msgQueryRespType
+	msgRelayType
 	msgActionType
 )
 
@@ -50,33 +53,29 @@ func (s *Serf) handleMsg(msg []byte) {
 	t := msgType(msg[0])
 	switch t {
 	case msgQueryType:
-		var q msgQuery
-		if err := decode(msg[1:], &q); err != nil {
-			s.logger.Printf("[ERR] serf: Error decoding query msessage: %s", err)
-			return
-		}
-		s.handleQuery(&q)
-
+		s.handleQuery(msg)
 	case msgQueryRespType:
-		var r msgQueryResponse
-		if err := decode(msg[1:], &r); err != nil {
-			s.logger.Printf("[ERR] serf: Error decoding query response messages: %s", err)
-			return
-		}
-		s.handleQueryResponse(&r)
+		s.handleQueryResponse(msg)
+	case msgRelayType:
+		s.handleRelay(msg)
 	}
 }
 
-func (s *Serf) handleQuery(q *msgQuery) {
+func (s *Serf) handleQuery(msg []byte) {
+	var q msgQuery
+	if err := decode(msg[1:], &q); err != nil {
+		s.logger.Printf("[ERR] serf: Error decoding query msessage: %s", err)
+		return
+	}
 	s.query.clock.Witness(q.LTime)
 
-	if !s.query.addToBuffer(q) {
+	if !s.query.addToBuffer(&q) {
 		return
 	}
 
-	s.broadcasts.broadcastQuery(msgQueryType, *q, nil)
+	s.broadcasts.broadcastQuery(msgQueryType, q, nil)
 
-	if !s.isQueryAccepted(q) {
+	if !s.isQueryAccepted(&q) {
 		return
 	}
 
@@ -97,6 +96,10 @@ func (s *Serf) handleQuery(q *msgQuery) {
 	err = s.mlist.SendUserMsg(&addr, msg)
 	if err != nil {
 		s.logger.Printf("[ERR] serf: failed to send query response to %s", addr.String())
+	}
+
+	if err := s.relay(int(q.NumRelays), msg, q.SourceIP, q.SourcePort, q.NodeID); err != nil {
+		s.logger.Printf("ERR serf: failed to relay query response to %s:%d", q.SourceIP, q.SourcePort)
 	}
 }
 
@@ -120,6 +123,73 @@ func (s *Serf) isQueryAccepted(q *msgQuery) bool {
 	return true
 }
 
-func (s *Serf) handleQueryResponse(r *msgQueryResponse) {
-	s.query.invokeResponseHandler(r)
+func (s *Serf) relay(numRelay int, msg []byte, desIP net.IP, destPort uint16, destID string) error {
+	if numRelay == 0 {
+		return nil
+	}
+	if s.mlist.NumActive() < numRelay+2 { // too few nodes
+		return nil
+	}
+	r := msgRelay{
+		Msg:      msg,
+		DestIP:   desIP,
+		DestPort: destPort,
+	}
+	encoded, err := encode(msgRelayType, r)
+	if err != nil {
+		return err
+	}
+	nodes := s.pickRelayNodes(numRelay, destID)
+	for _, n := range nodes {
+		addr := &net.UDPAddr{
+			IP:   n.IP,
+			Port: int(n.Port),
+		}
+		s.mlist.SendUserMsg(addr, encoded)
+	}
+	return nil
+}
+
+func (s *Serf) pickRelayNodes(numNodes int, destID string) []*memberlist.Node {
+	nodes := s.mlist.ActiveNodes()
+	l := len(nodes)
+	picked := make([]*memberlist.Node, 0, numNodes)
+PICKNODE:
+	for i := 0; i < 3*l && len(picked) < numNodes; i++ {
+		idx := randIntN(l)
+		node := nodes[idx]
+		if node.ID == s.ID() || node.ID == destID {
+			continue
+		}
+		for j := 0; j < len(picked); j++ {
+			if node.ID == picked[j].ID {
+				continue PICKNODE
+			}
+		}
+		picked = append(picked, node)
+	}
+	return picked
+}
+
+func (s *Serf) handleQueryResponse(msg []byte) {
+	var r msgQueryResponse
+	if err := decode(msg[1:], &r); err != nil {
+		s.logger.Printf("[ERR] serf: Error decoding query response messages: %s", err)
+		return
+	}
+	s.query.invokeResponseHandler(&r)
+}
+
+func (s *Serf) handleRelay(msg []byte) {
+	var r msgRelay
+	if err := decode(msg[1:], &r); err != nil {
+		s.logger.Printf("[ERR] serf: Error decoding relay response messages %s", err)
+	}
+	addr := &net.UDPAddr{
+		IP:   r.DestIP,
+		Port: int(r.DestPort),
+	}
+	if err := s.mlist.SendUserMsg(addr, r.Msg); err != nil {
+		s.logger.Printf("[ERR] serf: failed to send user msg to %s", addr.String())
+	}
 }

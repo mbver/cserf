@@ -62,6 +62,7 @@ func QueryParamFromPb(params *pb.QueryParam) *serf.QueryParam {
 		res.FilterTags = append(res.FilterTags, f)
 	}
 	res.Timeout = params.Timeout.AsDuration()
+	res.NumRelays = uint8(params.NumRelays)
 	return res
 }
 
