@@ -49,3 +49,20 @@ func (b *lBuffer) addNewLTime(item lItem) {
 		LTime: item.LTime(),
 	}
 }
+
+func (b *lBuffer) addItem(currentTime LamportTime, item lItem) bool {
+	if b.isTooOld(currentTime, item) {
+		return false
+	}
+	if b.isLTimeNew(item.LTime()) {
+		b.addNewLTime(item)
+		return true
+	}
+	idx := item.LTime() % b.len()
+	group := (*b)[idx]
+	if group.has(item) {
+		return false
+	}
+	group.add(item)
+	return true
+}

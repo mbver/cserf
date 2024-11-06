@@ -89,25 +89,11 @@ func (m *QueryManager) invokeResponseHandler(r *msgQueryResponse) {
 	}
 }
 
-// lock here or lock outside?
 func (m *QueryManager) addToBuffer(msg *msgQuery) (success bool) {
 	m.l.Lock()
 	defer m.l.Unlock()
 	b := &bufQuery{msg.LTime, msg.ID}
-	if m.buffers.isTooOld(m.clock.Time(), b) {
-		return false
-	}
-	if m.buffers.isLTimeNew(b.LTime()) {
-		m.buffers.addNewLTime(b)
-		return true
-	}
-	idx := b.LTime() % m.buffers.len()
-	group := m.buffers[idx]
-	if group.has(b) {
-		return false
-	}
-	group.add(b)
-	return true
+	return m.buffers.addItem(m.clock.Time(), b)
 }
 
 func (s *Serf) Query(res chan string) error {
