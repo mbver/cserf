@@ -10,10 +10,12 @@ import (
 )
 
 type QueryParam struct {
+	Name       string
 	ForNodes   []string
 	FilterTags []FilterTag
 	Timeout    time.Duration
 	NumRelays  uint8
+	Payload    []byte
 }
 
 type FilterTag struct {
@@ -22,6 +24,7 @@ type FilterTag struct {
 }
 
 type msgQuery struct {
+	Name       string
 	LTime      LamportTime
 	ID         uint32
 	SourceIP   net.IP
@@ -30,6 +33,7 @@ type msgQuery struct {
 	ForNodes   []string    `codec:",omitempty"`
 	FilterTags []FilterTag `codec:",omitempty"`
 	NumRelays  uint8
+	Payload    []byte
 }
 
 type bufQuery struct {
@@ -140,6 +144,7 @@ func (s *Serf) Query(res chan string, params *QueryParam) (chan string, error) {
 	lTime := s.query.clock.Time()
 	s.query.clock.Next()
 	q := msgQuery{
+		Name:       params.Name,
 		LTime:      lTime,
 		ID:         uint32(rand.Int31()),
 		SourceIP:   addr,
@@ -148,6 +153,7 @@ func (s *Serf) Query(res chan string, params *QueryParam) (chan string, error) {
 		ForNodes:   params.ForNodes,
 		FilterTags: params.FilterTags,
 		NumRelays:  params.NumRelays,
+		Payload:    params.Payload,
 	}
 	s.query.setResponseHandler(q.LTime, q.ID, res, params.Timeout) // TODO: have it as input or config value
 	// handle query locally

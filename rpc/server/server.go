@@ -53,6 +53,7 @@ func (s *Server) HelloStream(name *pb.StringValue, stream pb.Serf_HelloStreamSer
 
 func QueryParamFromPb(params *pb.QueryParam) *serf.QueryParam {
 	var res = &serf.QueryParam{}
+	res.Name = params.Name
 	res.ForNodes = params.ForNodes
 	for _, tag := range params.FilterTags {
 		f := serf.FilterTag{
@@ -63,6 +64,7 @@ func QueryParamFromPb(params *pb.QueryParam) *serf.QueryParam {
 	}
 	res.Timeout = params.Timeout.AsDuration()
 	res.NumRelays = uint8(params.NumRelays)
+	res.Payload = params.Payload
 	return res
 }
 

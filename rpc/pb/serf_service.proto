@@ -12,10 +12,12 @@ message StringValue {
 message Empty {}
 
 message QueryParam{
-    repeated string for_nodes = 1;
-    repeated FilterTag filter_tags = 2;
-    google.protobuf.Duration timeout = 3;
-    uint32 num_relays = 4;
+    string name = 1;
+    repeated string for_nodes = 2;
+    repeated FilterTag filter_tags = 3;
+    google.protobuf.Duration timeout = 4;
+    uint32 num_relays = 5;
+    bytes payload = 6;
 }
 
 message FilterTag {
