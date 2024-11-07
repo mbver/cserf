@@ -84,14 +84,15 @@ func (s *Serf) invokeEventScript(script string, event Event) error {
 		return err
 	}
 
+	err = cmd.Wait()
+	slowTimer.Stop()
+
 	// Warn if buffer is overritten
 	if output.TotalWritten() > output.Size() {
 		s.logger.Printf("[WARN] agent: Script '%s' generated %d bytes of output, truncated to %d",
 			script, output.TotalWritten(), output.Size())
 	}
 
-	err = cmd.Wait()
-	slowTimer.Stop()
 	s.logger.Printf("[DEBUG] agent: Event '%s' script output: %s, err: %v",
 		event.String(), output.String(), err)
 
