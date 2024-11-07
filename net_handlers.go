@@ -101,6 +101,16 @@ func (s *Serf) handleQuery(msg []byte) {
 	if err := s.relay(int(q.NumRelays), msg, q.SourceIP, q.SourcePort, q.NodeID); err != nil {
 		s.logger.Printf("ERR serf: failed to relay query response to %s:%d", q.SourceIP, q.SourcePort)
 	}
+
+	s.inEventCh <- &QueryEvent{
+		Name:      q.Name,
+		LTime:     q.LTime,
+		ID:        q.ID,
+		SourceIP:  q.SourceIP,
+		NodeID:    q.NodeID,
+		NumRelays: q.NumRelays,
+		Payload:   q.Payload,
+	}
 }
 
 func (s *Serf) isQueryAccepted(q *msgQuery) bool {

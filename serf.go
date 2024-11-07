@@ -11,6 +11,8 @@ const tagMagicByte msgType = 255
 
 type Serf struct {
 	config     *Config
+	inEventCh  chan Event
+	outEventCh chan Event
 	mlist      *memberlist.Memberlist
 	broadcasts *broadcastManager
 	query      *QueryManager
@@ -51,6 +53,12 @@ func (b *SerfBuilder) WithTags(tags map[string]string) {
 func (b *SerfBuilder) Build() (*Serf, error) {
 	s := &Serf{}
 	s.config = b.conf
+
+	eventCh := make(chan Event, 1024)
+	s.inEventCh = eventCh
+	// TODO: setup snapshot, coalescer and key event handlers to change outEventCh later
+	s.outEventCh = eventCh
+
 	mbuilder := &memberlist.MemberlistBuilder{}
 	mbuilder.WithConfig(b.mconf)
 	mbuilder.WithLogger(b.logger)
@@ -85,6 +93,8 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.shutdownCh = make(chan struct{})
 
 	go s.receiveMsgs()
+	go s.receiveEvents()
+
 	return s, nil
 }
 
