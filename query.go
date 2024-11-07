@@ -51,9 +51,10 @@ func (b *bufQuery) Equal(item lItem) bool {
 }
 
 type msgQueryResponse struct {
-	LTime LamportTime
-	ID    uint32
-	From  string
+	LTime   LamportTime
+	ID      uint32
+	From    string
+	Payload []byte
 }
 
 type msgRelay struct {

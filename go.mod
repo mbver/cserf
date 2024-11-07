@@ -5,7 +5,7 @@ go 1.22.0
 toolchain go1.23.2
 
 require (
-	github.com/golang/protobuf v1.5.2
+	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/hashicorp/go-msgpack v0.5.5
 	github.com/mbver/mlist v0.0.0-20241106061835-be7809b99b22
 	github.com/stretchr/testify v1.9.0

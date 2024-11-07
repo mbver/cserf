@@ -80,36 +80,15 @@ func (s *Serf) handleQuery(msg []byte) {
 	}
 
 	// TODO: this will be removed because it the QueryEvent will do the respond further down the pipeline
-	resp := msgQueryResponse{
-		LTime: q.LTime,
-		ID:    q.ID,
-		From:  s.mlist.ID(),
-	}
-	msg, err := encode(msgQueryRespType, resp)
-	if err != nil {
-		s.logger.Printf("[ERR] serf: encode query response message failed")
-	}
-	addr := net.UDPAddr{
-		IP:   q.SourceIP,
-		Port: int(q.SourcePort),
-	}
-	err = s.mlist.SendUserMsg(&addr, msg)
-	if err != nil {
-		s.logger.Printf("[ERR] serf: failed to send query response to %s", addr.String())
-	}
-
-	if err := s.relay(int(q.NumRelays), msg, q.SourceIP, q.SourcePort, q.NodeID); err != nil {
-		s.logger.Printf("ERR serf: failed to relay query response to %s:%d", q.SourceIP, q.SourcePort)
-	}
-
 	s.inEventCh <- &QueryEvent{
-		Name:      q.Name,
-		LTime:     q.LTime,
-		ID:        q.ID,
-		SourceIP:  q.SourceIP,
-		NodeID:    q.NodeID,
-		NumRelays: q.NumRelays,
-		Payload:   q.Payload,
+		Name:       q.Name,
+		LTime:      q.LTime,
+		ID:         q.ID,
+		SourceIP:   q.SourceIP,
+		SourcePort: q.SourcePort,
+		NodeID:     q.NodeID,
+		NumRelays:  q.NumRelays,
+		Payload:    q.Payload,
 	}
 }
 
