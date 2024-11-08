@@ -57,6 +57,7 @@ func testNode() (*serf.Serf, func(), error) {
 	b.WithMemberlistConfig(mconf)
 
 	conf := &serf.Config{
+		EventScript:      testEventScript,
 		QueryBufferSize:  1024,
 		QueryTimeoutMult: 16,
 	} // fill in later

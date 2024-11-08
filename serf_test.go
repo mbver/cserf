@@ -12,6 +12,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testEventScript string
+
+func createTestEventScript() (string, func(), error) {
+	cleanup := func() {}
+	tmp, err := os.CreateTemp("", "*script.sh")
+	if err != nil {
+		return "", cleanup, err
+	}
+	defer tmp.Close()
+	cleanup = func() {
+		os.Remove(tmp.Name())
+	}
+	if _, err := tmp.Write([]byte(`echo "Hello"`)); err != nil {
+		return "", cleanup, err
+	}
+	if err := os.Chmod(tmp.Name(), 0755); err != nil {
+		fmt.Println("Error making temp file executable:", err)
+		return "", cleanup, err
+	}
+	return tmp.Name(), cleanup, nil
+}
+
 func testMemberlistConfig() *memberlist.Config {
 	conf := memberlist.DefaultLANConfig()
 	conf.ProbeInterval = 0
@@ -47,6 +69,7 @@ func testNode(tags map[string]string) (*Serf, func(), error) {
 	b.WithMemberlistConfig(mconf)
 
 	conf := &Config{
+		EventScript:      testEventScript,
 		QueryBufferSize:  1024,
 		QueryTimeoutMult: 16,
 	} // fill in later
@@ -90,6 +113,16 @@ func threeNodes() (*Serf, *Serf, *Serf, func(), error) {
 		return nil, nil, nil, cleanup, err
 	}
 	return s1, s2, s3, cleanup, err
+}
+
+func TestMain(m *testing.M) {
+	tmp, cleanup, err := createTestEventScript()
+	defer cleanup()
+	if err != nil {
+		panic(err)
+	}
+	testEventScript = tmp
+	m.Run()
 }
 
 func TestSerf_Create(t *testing.T) {

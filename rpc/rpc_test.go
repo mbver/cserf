@@ -23,6 +23,28 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+var testEventScript string
+
+func createTestEventScript() (string, func(), error) {
+	cleanup := func() {}
+	tmp, err := os.CreateTemp("", "*script.sh")
+	if err != nil {
+		return "", cleanup, err
+	}
+	defer tmp.Close()
+	cleanup = func() {
+		os.Remove(tmp.Name())
+	}
+	if _, err := tmp.Write([]byte(`echo "Hello"`)); err != nil {
+		return "", cleanup, err
+	}
+	if err := os.Chmod(tmp.Name(), 0755); err != nil {
+		fmt.Println("Error making temp file executable:", err)
+		return "", cleanup, err
+	}
+	return tmp.Name(), cleanup, nil
+}
+
 func generateSelfSignedCert() (string, string, func(), error) {
 	cleanup := func() {}
 	// Generate a private key
@@ -107,6 +129,13 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+
+	tmp, cleanup3, err := createTestEventScript()
+	defer cleanup3()
+	if err != nil {
+		panic(err)
+	}
+	testEventScript = tmp
 
 	m.Run()
 }

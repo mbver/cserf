@@ -10,16 +10,18 @@ import (
 const tagMagicByte msgType = 255
 
 type Serf struct {
-	config     *Config
-	inEventCh  chan Event
-	outEventCh chan Event
-	mlist      *memberlist.Memberlist
-	broadcasts *broadcastManager
-	query      *QueryManager
-	userMsgCh  chan []byte
-	logger     *log.Logger
-	shutdownCh chan struct{}
-	tags       map[string]string
+	config         *Config
+	inEventCh      chan Event
+	outEventCh     chan Event
+	invokeScriptCh chan *invokeScript
+	eventHandlers  *eventHandlerManager
+	mlist          *memberlist.Memberlist
+	broadcasts     *broadcastManager
+	query          *QueryManager
+	userMsgCh      chan []byte
+	logger         *log.Logger
+	shutdownCh     chan struct{}
+	tags           map[string]string
 }
 
 type SerfBuilder struct {
@@ -59,6 +61,11 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	// TODO: setup snapshot, coalescer and key event handlers to change outEventCh later
 	s.outEventCh = eventCh
 
+	s.invokeScriptCh = make(chan *invokeScript)
+	s.eventHandlers = newEventHandlerManager()
+	scriptHandlers := CreateScriptHandlers(s.config.EventScript, s.invokeScriptCh)
+	s.eventHandlers.script.update(scriptHandlers)
+
 	mbuilder := &memberlist.MemberlistBuilder{}
 	mbuilder.WithConfig(b.mconf)
 	mbuilder.WithLogger(b.logger)
@@ -94,6 +101,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 
 	go s.receiveMsgs()
 	go s.receiveEvents()
+	go s.receiveInvokeScripts()
 
 	return s, nil
 }
