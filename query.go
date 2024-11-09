@@ -36,20 +36,6 @@ type msgQuery struct {
 	Payload    []byte
 }
 
-type bufQuery struct {
-	ltime LamportTime
-	id    uint32
-}
-
-func (b *bufQuery) LTime() LamportTime {
-	return b.ltime
-}
-
-func (b *bufQuery) Equal(item lItem) bool {
-	b1 := item.(*bufQuery)
-	return b1.id == b.id
-}
-
 type msgQueryResponse struct {
 	LTime   LamportTime
 	ID      uint32
@@ -126,8 +112,8 @@ func (m *QueryManager) invokeResponseHandler(r *msgQueryResponse) {
 func (m *QueryManager) addToBuffer(msg *msgQuery) (success bool) {
 	m.l.Lock()
 	defer m.l.Unlock()
-	b := &bufQuery{msg.LTime, msg.ID}
-	return m.buffers.addItem(m.clock.Time(), b)
+	item := &lItem{msg.LTime, msg.ID}
+	return m.buffers.addItem(m.clock.Time(), item)
 }
 
 func (s *Serf) Query(res chan string, params *QueryParam) (chan string, error) {
@@ -147,7 +133,7 @@ func (s *Serf) Query(res chan string, params *QueryParam) (chan string, error) {
 	q := msgQuery{
 		Name:       params.Name,
 		LTime:      lTime,
-		ID:         uint32(rand.Int31()),
+		ID:         rand.Uint32(),
 		SourceIP:   addr,
 		SourcePort: port,
 		NodeID:     s.ID(),

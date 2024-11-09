@@ -58,7 +58,7 @@ func testNode() (*serf.Serf, func(), error) {
 
 	conf := &serf.Config{
 		EventScript:      testEventScript,
-		QueryBufferSize:  1024,
+		LBufferSize:      1024,
 		QueryTimeoutMult: 16,
 	} // fill in later
 	b.WithConfig(conf)

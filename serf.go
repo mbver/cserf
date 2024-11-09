@@ -18,6 +18,7 @@ type Serf struct {
 	mlist          *memberlist.Memberlist
 	broadcasts     *broadcastManager
 	query          *QueryManager
+	action         *ActionManager
 	userMsgCh      chan []byte
 	logger         *log.Logger
 	shutdownCh     chan struct{}
@@ -96,7 +97,8 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.mlist = m
 
 	s.logger = b.logger
-	s.query = newQueryManager(b.logger, b.conf.QueryBufferSize)
+	s.query = newQueryManager(b.logger, b.conf.LBufferSize)
+	s.action = newActionManager(b.conf.LBufferSize)
 	s.shutdownCh = make(chan struct{})
 
 	go s.receiveMsgs()

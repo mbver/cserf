@@ -90,7 +90,6 @@ func (m *scriptEventHandlerManager) handleEvent(e Event) {
 
 // replace the whole handler list!
 func (m *scriptEventHandlerManager) update(handlers []*ScriptEventHandler) {
-	fmt.Println("==== update", handlers)
 	m.l.Lock()
 	defer m.l.Unlock()
 	m.newHandlers = handlers
@@ -232,6 +231,10 @@ func (s *Serf) invokeEventScript(script string, event Event) error {
 	}
 
 	switch e := event.(type) {
+	case *ActionEvent:
+		cmd.Env = append(cmd.Env, "SERF_ACTION_EVENT="+e.Name) // will be read by the script
+		cmd.Env = append(cmd.Env, fmt.Sprintf("SERF_ACTION_LTIME=%d", e.LTime))
+		go streamPayload(s.logger, stdin, e.Payload)
 	case *QueryEvent:
 		cmd.Env = append(cmd.Env, "SERF_QUERY_NAME="+e.Name)
 		cmd.Env = append(cmd.Env, fmt.Sprintf("SERF_QUERY_LTIME=%d", e.LTime))

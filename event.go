@@ -18,8 +18,8 @@ const (
 	EventMemberFailed
 	EventMemberUpdate
 	EventMemberReap
-	EventUser
 	EventQuery
+	EventAction
 )
 
 func (t EventType) String() string {
@@ -34,10 +34,10 @@ func (t EventType) String() string {
 		return "member-update"
 	case EventMemberReap:
 		return "member-reap"
-	case EventUser:
-		return "user"
 	case EventQuery:
 		return "query"
+	case EventAction:
+		return "action"
 	}
 	return "unknown- event"
 }
@@ -59,4 +59,19 @@ func (q *QueryEvent) EventType() EventType {
 
 func (q *QueryEvent) String() string {
 	return fmt.Sprintf("query: %s", q.Name)
+}
+
+type ActionEvent struct {
+	LTime   LamportTime
+	Name    string
+	ID      uint32
+	Payload []byte
+}
+
+func (a *ActionEvent) EventType() EventType {
+	return EventAction
+}
+
+func (a *ActionEvent) String() string {
+	return fmt.Sprintf("action: %s", a.Name)
 }

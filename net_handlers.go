@@ -30,9 +30,6 @@ func (t msgType) String() string {
 }
 
 // cluster action request
-type msgAction struct {
-	Name string
-}
 
 func (s *Serf) receiveMsgs() {
 	for {
@@ -58,6 +55,8 @@ func (s *Serf) handleMsg(msg []byte) {
 		s.handleQueryResponse(msg)
 	case msgRelayType:
 		s.handleRelay(msg)
+	case msgActionType:
+		s.handleAction(msg)
 	}
 }
 
@@ -72,7 +71,6 @@ func (s *Serf) handleQuery(msg []byte) {
 	if !s.query.addToBuffer(&q) {
 		return
 	}
-
 	s.broadcasts.broadcastQuery(msgQueryType, q, nil)
 
 	if !s.isQueryAccepted(&q) {
@@ -180,5 +178,25 @@ func (s *Serf) handleRelay(msg []byte) {
 	}
 	if err := s.mlist.SendUserMsg(addr, r.Msg); err != nil {
 		s.logger.Printf("[ERR] serf: failed to send user msg to %s", addr.String())
+	}
+}
+
+func (s *Serf) handleAction(msg []byte) {
+	var a msgAction
+	if err := decode(msg[1:], &a); err != nil {
+		s.logger.Printf(("[ERR] serf: Error decoding action message %s"), err)
+	}
+	s.action.clock.Witness(a.LTime)
+
+	if !s.action.addToBuffer(&a) {
+		return
+	}
+	s.broadcasts.broadcastAction(msgActionType, a, nil)
+
+	s.inEventCh <- &ActionEvent{
+		LTime:   a.LTime,
+		Name:    a.Name,
+		ID:      a.ID,
+		Payload: a.Payload,
 	}
 }

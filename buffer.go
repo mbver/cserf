@@ -1,16 +1,20 @@
 package serf
 
-type lItem interface {
-	LTime() LamportTime
-	Equal(lItem) bool
+type lItem struct {
+	ltime LamportTime
+	id    uint32
+}
+
+func (l *lItem) Equal(item *lItem) bool {
+	return l.ltime == item.ltime && l.id == item.id
 }
 
 type lGroupItem struct {
-	items []lItem
+	items []*lItem
 	LTime LamportTime
 }
 
-func (g *lGroupItem) has(item lItem) bool {
+func (g *lGroupItem) has(item *lItem) bool {
 	for _, i := range g.items {
 		if i.Equal(item) {
 			return true
@@ -19,7 +23,7 @@ func (g *lGroupItem) has(item lItem) bool {
 	return false
 }
 
-func (g *lGroupItem) add(item lItem) {
+func (g *lGroupItem) add(item *lItem) {
 	g.items = append(g.items, item)
 }
 
@@ -29,11 +33,11 @@ func (b *lBuffer) len() LamportTime {
 	return LamportTime(len(*b))
 }
 
-func (b *lBuffer) isTooOld(currentTime LamportTime, item lItem) bool {
+func (b *lBuffer) isTooOld(currentTime LamportTime, item *lItem) bool {
 	if currentTime <= b.len() {
 		return false
 	}
-	return item.LTime() < currentTime-b.len()
+	return item.ltime < currentTime-b.len()
 }
 
 func (b *lBuffer) isLTimeNew(t LamportTime) bool {
@@ -42,23 +46,23 @@ func (b *lBuffer) isLTimeNew(t LamportTime) bool {
 	return group == nil || group.LTime < t
 }
 
-func (b *lBuffer) addNewLTime(item lItem) {
-	idx := item.LTime() % b.len()
+func (b *lBuffer) addNewLTime(item *lItem) {
+	idx := item.ltime % b.len()
 	(*b)[idx] = &lGroupItem{
-		items: []lItem{item},
-		LTime: item.LTime(),
+		items: []*lItem{item},
+		LTime: item.ltime,
 	}
 }
 
-func (b *lBuffer) addItem(currentTime LamportTime, item lItem) bool {
+func (b *lBuffer) addItem(currentTime LamportTime, item *lItem) bool {
 	if b.isTooOld(currentTime, item) {
 		return false
 	}
-	if b.isLTimeNew(item.LTime()) {
+	if b.isLTimeNew(item.ltime) {
 		b.addNewLTime(item)
 		return true
 	}
-	idx := item.LTime() % b.len()
+	idx := item.ltime % b.len()
 	group := (*b)[idx]
 	if group.has(item) {
 		return false
