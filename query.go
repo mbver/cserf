@@ -56,11 +56,12 @@ type QueryResponseHandler struct {
 }
 
 type QueryManager struct {
-	l        sync.RWMutex
-	clock    *LamportClock
-	buffers  lBuffer
-	handlers map[LamportTime]*QueryResponseHandler
-	logger   *log.Logger
+	l            sync.RWMutex
+	queryMinTime LamportTime // TODO: set it in snapshot and check it
+	clock        *LamportClock
+	buffers      lBuffer
+	handlers     map[LamportTime]*QueryResponseHandler
+	logger       *log.Logger
 }
 
 func newQueryManager(logger *log.Logger, bufferSize int) *QueryManager {

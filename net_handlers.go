@@ -68,6 +68,9 @@ func (s *Serf) handleQuery(msg []byte) {
 	}
 	s.query.clock.Witness(q.LTime)
 
+	if q.LTime < s.query.queryMinTime {
+		return
+	}
 	if !s.query.addToBuffer(&q) {
 		return
 	}
@@ -187,6 +190,10 @@ func (s *Serf) handleAction(msg []byte) {
 		s.logger.Printf(("[ERR] serf: Error decoding action message %s"), err)
 	}
 	s.action.clock.Witness(a.LTime)
+
+	if a.LTime < s.action.actionMinTime {
+		return
+	}
 
 	if !s.action.addToBuffer(&a) {
 		return

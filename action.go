@@ -14,9 +14,10 @@ type msgAction struct {
 }
 
 type ActionManager struct {
-	l       sync.Mutex
-	clock   *LamportClock
-	buffers lBuffer
+	l             sync.Mutex
+	actionMinTime LamportTime // TODO: set it in snapshotting recovery
+	clock         *LamportClock
+	buffers       lBuffer
 }
 
 func newActionManager(bufferSize int) *ActionManager {
