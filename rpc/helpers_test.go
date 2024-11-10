@@ -3,7 +3,10 @@ package rpc
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
+	"path/filepath"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -56,11 +59,16 @@ func testNode() (*serf.Serf, func(), error) {
 	mconf.Label = "label"
 	b.WithMemberlistConfig(mconf)
 
+	snapfile := strconv.Itoa(rand.Int())
 	conf := &serf.Config{
-		EventScript:      testEventScript,
-		LBufferSize:      1024,
-		QueryTimeoutMult: 16,
+		EventScript:            testEventScript,
+		LBufferSize:            1024,
+		QueryTimeoutMult:       16,
+		SnapshotPath:           filepath.Join(os.TempDir(), snapfile),
+		SnapshotMinCompactSize: 128 * 1024,
 	} // fill in later
+
+	cleanup1 := combineCleanup(cleanup, func() { os.Remove(conf.SnapshotPath) })
 	b.WithConfig(conf)
 
 	prefix := fmt.Sprintf("serf-%s: ", mconf.BindAddr)
@@ -69,10 +77,10 @@ func testNode() (*serf.Serf, func(), error) {
 
 	s, err := b.Build()
 	if err != nil {
-		return nil, cleanup, err
+		return nil, cleanup1, err
 	}
-	cleanup1 := combineCleanup(s.Shutdown, cleanup)
-	return s, cleanup1, nil
+	cleanup2 := combineCleanup(s.Shutdown, cleanup1)
+	return s, cleanup2, nil
 }
 
 func twoNodes() (*serf.Serf, *serf.Serf, func(), error) {

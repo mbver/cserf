@@ -17,10 +17,12 @@ type Serf struct {
 	eventHandlers  *eventHandlerManager
 	mlist          *memberlist.Memberlist
 	broadcasts     *broadcastManager
+	clock          *LamportClock
 	query          *QueryManager
 	action         *ActionManager
 	userMsgCh      chan []byte
 	logger         *log.Logger
+	snapshot       *Snapshotter
 	shutdownCh     chan struct{}
 	tags           map[string]string
 }
@@ -56,11 +58,24 @@ func (b *SerfBuilder) WithTags(tags map[string]string) {
 func (b *SerfBuilder) Build() (*Serf, error) {
 	s := &Serf{}
 	s.config = b.conf
+	s.clock = &LamportClock{0}
+	s.shutdownCh = make(chan struct{})
 
-	eventCh := make(chan Event, 1024)
-	s.inEventCh = eventCh
-	// TODO: setup snapshot, coalescer and key event handlers to change outEventCh later
-	s.outEventCh = eventCh
+	s.inEventCh = make(chan Event, 1024)
+	snap, outCh, err := NewSnapshotter(s.config.SnapshotPath,
+		s.config.SnapshotMinCompactSize,
+		s.logger,
+		s.clock,
+		s.inEventCh,
+		s.shutdownCh,
+	)
+	if err != nil {
+		return nil, err
+	}
+	s.snapshot = snap // TODO: REPLAY?
+	s.outEventCh = outCh
+
+	// TODO: key event handlers to change outEventCh later
 
 	s.invokeScriptCh = make(chan *invokeScript)
 	s.eventHandlers = newEventHandlerManager()
@@ -99,7 +114,6 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.logger = b.logger
 	s.query = newQueryManager(b.logger, b.conf.LBufferSize)
 	s.action = newActionManager(b.conf.LBufferSize)
-	s.shutdownCh = make(chan struct{})
 
 	go s.receiveMsgs()
 	go s.receiveEvents()
@@ -115,6 +129,8 @@ func (s *Serf) Join(existing []string) (int, error) {
 func (s *Serf) Shutdown() {
 	s.mlist.Shutdown()
 	close(s.shutdownCh)
+	s.snapshot.Wait()
+	fmt.Println("time:", s.clock.Time())
 }
 
 func (s *Serf) NumNodes() int {

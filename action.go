@@ -34,6 +34,7 @@ func (m *ActionManager) addToBuffer(msg *msgAction) (succcess bool) {
 	return m.buffers.addItem(m.clock.Time(), item)
 }
 
+// trigger a cluster action on all nodes
 func (s *Serf) Action(name string, payload []byte) error {
 	// check size??
 	lTime := s.action.clock.Time()
