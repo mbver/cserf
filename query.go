@@ -43,6 +43,11 @@ type msgQueryResponse struct {
 	Payload []byte
 }
 
+type QueryResponse struct {
+	From    string
+	Payload []byte
+}
+
 type msgRelay struct {
 	Msg      []byte
 	DestIP   net.IP
@@ -51,7 +56,7 @@ type msgRelay struct {
 
 type QueryResponseHandler struct {
 	id       uint32
-	respCh   chan string
+	respCh   chan *QueryResponse
 	received map[string]struct{} // because handleMsg is sequential, no need to protect received with lock. furthermore, lock on manager is hold during accessing the handler!
 }
 
@@ -73,7 +78,7 @@ func newQueryManager(logger *log.Logger, bufferSize int) *QueryManager {
 	}
 }
 
-func (m *QueryManager) setResponseHandler(lTime LamportTime, id uint32, ch chan string, timeout time.Duration) {
+func (m *QueryManager) setResponseHandler(lTime LamportTime, id uint32, ch chan *QueryResponse, timeout time.Duration) {
 	time.AfterFunc(timeout, func() {
 		m.l.Lock()
 		close(m.handlers[lTime].respCh)
@@ -104,7 +109,7 @@ func (m *QueryManager) invokeResponseHandler(r *msgQueryResponse) {
 	}
 	h.received[r.From] = struct{}{}
 	select {
-	case h.respCh <- r.From:
+	case h.respCh <- &QueryResponse{r.From, r.Payload}:
 	case <-time.After(5 * time.Millisecond): // TODO: have a fixed value in config
 		m.logger.Printf("[ERR] serf query: timeout streaming response from %s", r.From)
 	}
@@ -117,7 +122,7 @@ func (m *QueryManager) addToBuffer(msg *msgQuery) (success bool) {
 	return m.buffers.addItem(m.clock.Time(), item)
 }
 
-func (s *Serf) Query(res chan string, params *QueryParam) (chan string, error) {
+func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) (chan *QueryResponse, error) {
 	if params == nil {
 		params = s.DefaultQueryParams()
 	}
@@ -143,14 +148,14 @@ func (s *Serf) Query(res chan string, params *QueryParam) (chan string, error) {
 		NumRelays:  params.NumRelays,
 		Payload:    params.Payload,
 	}
-	s.query.setResponseHandler(q.LTime, q.ID, res, params.Timeout) // TODO: have it as input or config value
+	s.query.setResponseHandler(q.LTime, q.ID, resCh, params.Timeout) // TODO: have it as input or config value
 	// handle query locally
 	msg, err := encode(msgQueryType, q)
 	if err != nil {
 		return nil, err
 	}
 	s.handleQuery(msg)
-	return res, nil
+	return resCh, nil
 }
 
 func (s *Serf) DefaultQueryParams() *QueryParam {

@@ -73,11 +73,11 @@ func (s *Server) Query(params *pb.QueryParam, stream pb.Serf_QueryServer) error 
 	if params != nil {
 		p = QueryParamFromPb(params)
 	}
-	respCh := make(chan string)
+	respCh := make(chan *serf.QueryResponse)
 	s.serf.Query(respCh, p)
-	for res := range respCh {
+	for r := range respCh {
 		stream.Send(&pb.StringValue{
-			Value: res,
+			Value: r.From,
 		})
 	}
 	return nil

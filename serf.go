@@ -66,6 +66,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.inEventCh = make(chan Event, 1024)
 	snap, outCh, err := NewSnapshotter(s.config.SnapshotPath,
 		s.config.SnapshotMinCompactSize,
+		s.config.SnapshotDrainTimeout,
 		s.logger,
 		s.clock,
 		s.inEventCh,

@@ -9,5 +9,6 @@ type Config struct {
 	QueryTimeoutMult       int
 	SnapshotPath           string
 	SnapshotMinCompactSize int
+	SnapshotDrainTimeout   time.Duration
 	CoalesceInterval       time.Duration
 } // TODO: broadcast timeout should inject to memberlist config

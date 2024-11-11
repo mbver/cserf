@@ -18,10 +18,10 @@ const (
 	clockUpdateInterval           = 500 * time.Millisecond
 	snapshotErrorRecoveryInterval = 30 * time.Second
 	eventChSize                   = 2048
-	drainTimeout                  = 250 * time.Millisecond
-	compactExt                    = ".compact"
-	snapshotBytesPerNode          = 128
-	snapshotCompactionFactor      = 2 // compact_threshold = numNodes * bytesPerNode * factor
+	// drainTimeout                  = 250 * time.Millisecond
+	compactExt               = ".compact"
+	snapshotBytesPerNode     = 128
+	snapshotCompactionFactor = 2 // compact_threshold = numNodes * bytesPerNode * factor
 )
 
 var snapshotPrefixes = []string{"alive: ", "not alive: ", "clock: ", "action clock: ", "query-clock: ", "coordinate: ", "leave", "#"}
@@ -42,6 +42,7 @@ type Snapshotter struct {
 	leaving         bool
 	logger          *log.Logger
 	minCompactSize  int64
+	drainTimeout    time.Duration
 	stopCh          chan struct{} // to wait for draining events when shutdownCh fires
 	shutdownCh      chan struct{} // serf's shutdownCh
 	lastRecovery    time.Time
@@ -56,8 +57,14 @@ func (p *NodeIDAddr) String() string {
 	return fmt.Sprintf("%s: %s", p.ID, p.Addr)
 }
 
-func NewSnapshotter(path string, minCompactSize int, logger *log.Logger, clock *LamportClock,
-	inCh chan Event, shutdownCh chan struct{}) (*Snapshotter, chan Event, error) {
+func NewSnapshotter(path string,
+	minCompactSize int,
+	drainTimeout time.Duration,
+	logger *log.Logger,
+	clock *LamportClock,
+	inCh chan Event,
+	shutdownCh chan struct{},
+) (*Snapshotter, chan Event, error) {
 
 	fh, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
@@ -85,6 +92,7 @@ func NewSnapshotter(path string, minCompactSize int, logger *log.Logger, clock *
 		leaveCh:         make(chan struct{}),
 		logger:          logger,
 		minCompactSize:  int64(minCompactSize),
+		drainTimeout:    drainTimeout,
 		stopCh:          make(chan struct{}),
 		shutdownCh:      shutdownCh,
 	}
@@ -151,7 +159,7 @@ func (s *Snapshotter) receiveEvents() {
 	// drain all events in teeCh
 	defer func() {
 		s.updateClock()
-		drainTimeout := time.After(drainTimeout)
+		drainTimeout := time.After(s.drainTimeout)
 		for {
 			select {
 			case e := <-s.teeCh:

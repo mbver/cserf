@@ -22,7 +22,7 @@ func TestSerf_Query(t *testing.T) {
 	n, err := s1.Join([]string{addr2, addr3})
 	require.Nil(t, err)
 	require.Equal(t, 2, n)
-	respCh := make(chan string, 3)
+	respCh := make(chan *QueryResponse, 3)
 	s1.Query(respCh, nil)
 
 	success, msg := retry(5, func() (bool, string) {
@@ -32,9 +32,9 @@ func TestSerf_Query(t *testing.T) {
 		}
 		found := make([]bool, 3)
 		for i := 0; i < 3; i++ {
-			str := <-respCh
+			r := <-respCh
 			for i, s := range []*Serf{s1, s2, s3} {
-				if str == s.ID() {
+				if r.From == s.ID() {
 					found[i] = true
 				}
 			}

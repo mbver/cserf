@@ -82,6 +82,7 @@ func testNode(tags map[string]string) (*Serf, func(), error) {
 		QueryTimeoutMult:       16,
 		SnapshotPath:           filepath.Join(os.TempDir(), snapfile),
 		SnapshotMinCompactSize: 128 * 1024,
+		SnapshotDrainTimeout:   10 * time.Millisecond,
 		CoalesceInterval:       5 * time.Millisecond,
 	} // fill in later
 
