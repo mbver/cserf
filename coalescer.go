@@ -34,6 +34,16 @@ func isMemberEvent(t EventType) bool {
 		t == EventMemberUpdate || t == EventMemberReap
 }
 
+func (c *MemberEventCoalescer) flush() {
+	for t, members := range c.eventMap {
+		c.outCh <- &CoalescedMemberEvent{
+			Type:    t,
+			Members: members,
+		}
+	}
+	c.eventMap = make(map[EventType][]*Member) // clean up flushed events
+}
+
 func (c *MemberEventCoalescer) coalesce() {
 	flushTicker := time.NewTicker(c.flushInterval)
 	defer flushTicker.Stop()
@@ -48,14 +58,9 @@ func (c *MemberEventCoalescer) coalesce() {
 			mEvent := e.(*MemberEvent)
 			c.eventMap[etype] = append(c.eventMap[etype], mEvent.Member)
 		case <-flushTicker.C:
-			for t, members := range c.eventMap {
-				c.outCh <- &CoalescedMemberEvent{
-					Type:    t,
-					Members: members,
-				}
-			}
-			c.eventMap = make(map[EventType][]*Member) // clean up flushed events
+			c.flush()
 		case <-c.shutdownCh:
+			c.flush()
 			c.logger.Printf("[WARN] serf member-event-coalescer: serf shutdown, quitting coalesce events")
 			return
 		}
