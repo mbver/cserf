@@ -14,6 +14,7 @@ const (
 	msgQueryRespType
 	msgRelayType
 	msgActionType
+	msgKeyRespType
 )
 
 func (t msgType) Code() int {

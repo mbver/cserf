@@ -375,7 +375,9 @@ func stdinPayload(logger *log.Logger, stdin io.WriteCloser, buf []byte) {
 	}
 }
 
-func (s *Serf) respondToQueryEvent(q *QueryEvent, output []byte) {
+var ErrQueryRespLimitExceed = fmt.Errorf("query response exceed limit")
+
+func (s *Serf) respondToQueryEvent(q *QueryEvent, output []byte) error {
 	resp := msgQueryResponse{
 		LTime:   q.LTime,
 		ID:      q.ID,
@@ -385,6 +387,11 @@ func (s *Serf) respondToQueryEvent(q *QueryEvent, output []byte) {
 	msg, err := encode(msgQueryRespType, resp)
 	if err != nil {
 		s.logger.Printf("[ERR] serf: encode query response message failed")
+		return err
+	}
+	if len(msg) > s.config.QueryResponseSizeLimit {
+		s.logger.Printf("[ERR] serf: query response size exceed limit: %d", len(msg))
+		return ErrQueryRespLimitExceed
 	}
 	addr := net.UDPAddr{
 		IP:   q.SourceIP,
@@ -393,11 +400,14 @@ func (s *Serf) respondToQueryEvent(q *QueryEvent, output []byte) {
 	err = s.mlist.SendUserMsg(&addr, msg)
 	if err != nil {
 		s.logger.Printf("[ERR] serf: failed to send query response to %s", addr.String())
+		return err
 	}
 
 	if err := s.relay(int(q.NumRelays), msg, q.SourceIP, q.SourcePort, q.NodeID); err != nil {
 		s.logger.Printf("ERR serf: failed to relay query response to %s:%d", q.SourceIP, q.SourcePort)
+		return err
 	}
+	return nil
 }
 
 func parseEventFilter(s string) (*eventFilter, error) {

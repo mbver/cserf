@@ -68,6 +68,7 @@ func testNode() (*serf.Serf, func(), error) {
 		EventScript:            testEventScript,
 		LBufferSize:            1024,
 		QueryTimeoutMult:       16,
+		QueryResponseSizeLimit: 1024,
 		SnapshotPath:           filepath.Join(os.TempDir(), snapfile),
 		SnapshotMinCompactSize: 128 * 1024,
 		SnapshotDrainTimeout:   10 * time.Millisecond,

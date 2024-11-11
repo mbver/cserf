@@ -11,9 +11,11 @@ const tagMagicByte msgType = 255
 
 type Serf struct {
 	config         *Config
+	keyring        *memberlist.Keyring
 	inEventCh      chan Event
 	outEventCh     chan Event
 	nodeEventCh    chan *memberlist.NodeEvent
+	keyQuery       *keyQueryReceptor
 	invokeScriptCh chan *invokeScript
 	eventHandlers  *eventHandlerManager
 	mlist          *memberlist.Memberlist
@@ -83,8 +85,12 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 		s.shutdownCh,
 	)
 
-	s.outEventCh = outCh
-	// TODO: key event handlers to change outEventCh later
+	s.keyQuery = &keyQueryReceptor{
+		inCh:  outCh,
+		outCh: make(chan Event, 1024),
+	}
+
+	s.outEventCh = s.keyQuery.outCh
 
 	s.invokeScriptCh = make(chan *invokeScript)
 	s.eventHandlers = newEventHandlerManager()
@@ -94,7 +100,9 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	mbuilder := &memberlist.MemberlistBuilder{}
 	mbuilder.WithConfig(b.mconf)
 	mbuilder.WithLogger(b.logger)
+
 	mbuilder.WithKeyRing(b.keyring)
+	s.keyring = b.keyring
 
 	s.nodeEventCh = make(chan *memberlist.NodeEvent, 1024)
 	mbuilder.WithEventCh(s.nodeEventCh)
@@ -127,9 +135,10 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.action = newActionManager(b.conf.LBufferSize)
 
 	go s.receiveNodeEvents()
+	go s.receiveKeyEvents()
 	go s.receiveEvents()
-	go s.receiveMsgs()
 	go s.receiveInvokeScripts()
+	go s.receiveMsgs()
 
 	return s, nil
 }

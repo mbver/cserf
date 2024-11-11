@@ -7,6 +7,7 @@ type Config struct {
 	LBufferSize            int
 	RelayFactor            int
 	QueryTimeoutMult       int
+	QueryResponseSizeLimit int
 	SnapshotPath           string
 	SnapshotMinCompactSize int
 	SnapshotDrainTimeout   time.Duration

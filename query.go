@@ -122,7 +122,7 @@ func (m *QueryManager) addToBuffer(msg *msgQuery) (success bool) {
 	return m.buffers.addItem(m.clock.Time(), item)
 }
 
-func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) (chan *QueryResponse, error) {
+func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) error {
 	if params == nil {
 		params = s.DefaultQueryParams()
 	}
@@ -132,7 +132,7 @@ func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) (chan *Query
 
 	addr, port, err := s.mlist.GetAdvertiseAddr()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	lTime := s.query.clock.Time()
 	s.query.clock.Next()
@@ -152,10 +152,10 @@ func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) (chan *Query
 	// handle query locally
 	msg, err := encode(msgQueryType, q)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	s.handleQuery(msg)
-	return resCh, nil
+	return nil
 }
 
 func (s *Serf) DefaultQueryParams() *QueryParam {
