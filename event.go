@@ -75,3 +75,36 @@ func (a *ActionEvent) EventType() EventType {
 func (a *ActionEvent) String() string {
 	return fmt.Sprintf("action: %s", a.Name)
 }
+
+type Member struct {
+	ID   string
+	IP   net.IP
+	Port uint16
+	Tags []byte
+}
+
+type MemberEvent struct {
+	Type   EventType
+	Member *Member
+}
+
+func (m *MemberEvent) EventType() EventType {
+	return m.Type
+}
+
+func (m *MemberEvent) String() string {
+	return m.Type.String()
+}
+
+type CoalescedMemberEvent struct {
+	Type    EventType
+	Members []*Member
+}
+
+func (m *CoalescedMemberEvent) EventType() EventType {
+	return m.Type
+}
+
+func (m *CoalescedMemberEvent) String() string {
+	return m.Type.String()
+}

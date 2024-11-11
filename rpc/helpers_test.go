@@ -59,6 +59,10 @@ func testNode() (*serf.Serf, func(), error) {
 	mconf.Label = "label"
 	b.WithMemberlistConfig(mconf)
 
+	prefix := fmt.Sprintf("serf-%s: ", mconf.BindAddr)
+	logger := log.New(os.Stderr, prefix, log.LstdFlags)
+	b.WithLogger(logger)
+
 	snapfile := strconv.Itoa(rand.Int())
 	conf := &serf.Config{
 		EventScript:            testEventScript,
@@ -66,14 +70,16 @@ func testNode() (*serf.Serf, func(), error) {
 		QueryTimeoutMult:       16,
 		SnapshotPath:           filepath.Join(os.TempDir(), snapfile),
 		SnapshotMinCompactSize: 128 * 1024,
+		CoalesceInterval:       5 * time.Millisecond,
 	} // fill in later
 
-	cleanup1 := combineCleanup(cleanup, func() { os.Remove(conf.SnapshotPath) })
-	b.WithConfig(conf)
+	cleanup1 := combineCleanup(cleanup, func() {
+		data, _ := os.ReadFile(conf.SnapshotPath)
+		logger.Printf("### snapshot %s:", string(data))
+		os.Remove(conf.SnapshotPath)
+	})
 
-	prefix := fmt.Sprintf("serf-%s: ", mconf.BindAddr)
-	logger := log.New(os.Stderr, prefix, log.LstdFlags)
-	b.WithLogger(logger)
+	b.WithConfig(conf)
 
 	s, err := b.Build()
 	if err != nil {

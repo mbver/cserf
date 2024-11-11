@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -13,14 +14,14 @@ import (
 )
 
 const (
-	flushInterval                 = 500 * time.Millisecond // flushInterval is how often we force a flush of the snapshot file
+	flushInterval                 = 500 * time.Millisecond
 	clockUpdateInterval           = 500 * time.Millisecond
 	snapshotErrorRecoveryInterval = 30 * time.Second
 	eventChSize                   = 2048
 	drainTimeout                  = 250 * time.Millisecond
 	compactExt                    = ".compact"
 	snapshotBytesPerNode          = 128
-	snapshotCompactionFactor      = 2 // threshold = numNodes * bytesPerNode * factor
+	snapshotCompactionFactor      = 2 // compact_threshold = numNodes * bytesPerNode * factor
 )
 
 var snapshotPrefixes = []string{"alive: ", "not alive: ", "clock: ", "action clock: ", "query-clock: ", "coordinate: ", "leave", "#"}
@@ -55,13 +56,10 @@ func (p *NodeIDAddr) String() string {
 	return fmt.Sprintf("%s: %s", p.ID, p.Addr)
 }
 
-// // inCh will be drained by snapshotter. these events are processed and logged.
-// // outCh will be fed with events from inCh. outCh will be inCh for coalescer.
 func NewSnapshotter(path string, minCompactSize int, logger *log.Logger, clock *LamportClock,
 	inCh chan Event, shutdownCh chan struct{}) (*Snapshotter, chan Event, error) {
 
-	// Try to open the file
-	fh, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644) // owner read/write. other only read
+	fh, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to open snapshot: %v", err)
 	}
@@ -75,19 +73,19 @@ func NewSnapshotter(path string, minCompactSize int, logger *log.Logger, clock *
 	// Create the snapshotter
 	snap := &Snapshotter{
 		aliveNodes:      make(map[string]string),
-		clock:           clock, // THE SERF'S CLOCK? FOR WHAT?
+		clock:           clock, // TODO: TRY REMOVE
 		path:            path,
-		fh:              fh,                  // TO WRITE
-		buffer:          bufio.NewWriter(fh), // BUFFER BEFORE WRITE. JUST CALL IT BUF. BUT DO WE NEED FH DIRECTLY?
+		fh:              fh,
+		buffer:          bufio.NewWriter(fh),
 		offset:          offset,
 		teeCh:           make(chan Event, eventChSize),
 		lastClock:       0,
 		lastActionClock: 0,
-		lastQueryClock:  0,                   // ARE THEY LAMPORT TIME?
-		leaveCh:         make(chan struct{}), // FORWHAT?
+		lastQueryClock:  0,
+		leaveCh:         make(chan struct{}),
 		logger:          logger,
 		minCompactSize:  int64(minCompactSize),
-		stopCh:          make(chan struct{}), // WAIT IN SHUTDOWN?
+		stopCh:          make(chan struct{}),
 		shutdownCh:      shutdownCh,
 	}
 	// restore snapshotter from log
@@ -98,7 +96,7 @@ func NewSnapshotter(path string, minCompactSize int, logger *log.Logger, clock *
 
 	outCh := make(chan Event, eventChSize)
 	// process events from inCh
-	go snap.teeEvents(inCh, outCh) // TSTREAM VS STREAM?
+	go snap.teeEvents(inCh, outCh)
 	go snap.receiveEvents()
 
 	return snap, outCh, nil
@@ -136,7 +134,7 @@ func (s *Snapshotter) teeEvents(inCh, outCh chan Event) {
 }
 
 func (s *Snapshotter) receiveEvents() {
-	clockTicker := time.NewTicker(clockUpdateInterval) // FOR UPDATING CLOCK? WHY WE NEED UPDATING CLOCK? TO GET LATEST CLOCK TIME? IF WE MISS SOME? IT'S FINE!
+	clockTicker := time.NewTicker(clockUpdateInterval) // TODO: TRY REMOVE
 	defer clockTicker.Stop()
 
 	flushTicker := time.NewTicker(flushInterval)
@@ -160,8 +158,6 @@ func (s *Snapshotter) receiveEvents() {
 				s.recordEvent(e)
 			case <-drainTimeout:
 				return
-			default:
-				return
 			}
 		}
 	}()
@@ -169,15 +165,15 @@ func (s *Snapshotter) receiveEvents() {
 	for {
 		select {
 		case <-s.leaveCh:
-			s.leaving = true // no need for lock, because s.process is used only in this select loop
+			s.leaving = true // only accessed sequentially in this loop, no need for lock
 			s.tryAppend("leave\n")
 			if err := s.buffer.Flush(); err != nil {
 				s.logger.Printf("[ERR] serf: failed to flush leave to snapshot: %v", err)
 			}
 		case e := <-s.teeCh:
 			s.recordEvent(e)
-		case <-clockTicker.C:
-			s.updateClock() // ======= if we don't need clock for member management, then no need to update clock!
+		case <-clockTicker.C: // TODO: TRY REMOVE
+			s.updateClock()
 		case <-flushTicker.C:
 			if err := s.buffer.Flush(); err != nil {
 				s.recover()
@@ -188,14 +184,14 @@ func (s *Snapshotter) receiveEvents() {
 	}
 }
 
-// // only call in receiveEvents
+// only call in receiveEvents
 func (s *Snapshotter) recordEvent(e Event) {
-	if s.leaving { // set in receiveEventsLoop. no need for lock.
+	if s.leaving { // no need for lock because accessed sequentially in receiveEvents loop
 		return
 	}
 	switch event := e.(type) {
-	// case *MemberEvent:
-	// 	s.recordMemberEvent(event)
+	case *MemberEvent:
+		s.recordMemberEvent(event)
 	case *ActionEvent:
 		s.recordActionClock(event.LTime)
 	case *QueryEvent:
@@ -205,40 +201,33 @@ func (s *Snapshotter) recordEvent(e Event) {
 	}
 }
 
-// // at new node to aliveNodes and add a log alive.
-// // delete failed or left node from aliveNodes and add a log not-alive
-// func (s *Snapshotter) recordMemberEvent(e *MemberEvent) {
-// 	switch e.Type {
-// 	case EventMemberJoin:
-// 		for _, mem := range e.Members {
-// 			addr := net.TCPAddr{IP: mem.Addr, Port: int(mem.Port)}
-// 			s.aliveNodes[mem.Name] = addr.String() // ========== ipv6 may have different format! we may obtain its directly from node!
+// at new node to aliveNodes and add a log alive.
+// delete failed or left node from aliveNodes and add a log not-alive
+func (s *Snapshotter) recordMemberEvent(e *MemberEvent) {
+	switch e.Type {
+	case EventMemberJoin:
+		m := e.Member
+		addr := net.TCPAddr{IP: m.IP, Port: int(m.Port)}
+		s.aliveNodes[m.ID] = addr.String()
+		s.tryAppend(fmt.Sprintf("alive: %s %s\n", m.ID, addr.String()))
 
-// 			s.tryAppend(fmt.Sprintf("alive: %s %s\n", mem.Name, addr.String()))
-// 		}
+	case EventMemberLeave:
+		m := e.Member
+		delete(s.aliveNodes, m.ID)
+		s.tryAppend(fmt.Sprintf("not-alive: %s\n", m.ID))
+	}
+	s.updateClock()
+}
 
-// 	case EventMemberLeave:
-// 		fallthrough
-// 	case EventMemberFailed: // failed means dead
-// 		for _, mem := range e.Members {
-// 			delete(s.aliveNodes, mem.Name)
-// 			s.tryAppend(fmt.Sprintf("not-alive: %s\n", mem.Name))
-// 		}
-// 	}
-
-// 	s.updateClock()
-// }
-
-// // record the clock of serf. but do we really need? as join and leave are managed by memberlist now!
+// TODO: consider remove
 func (s *Snapshotter) updateClock() {
-	current := s.clock.Time() // 0 - 1 is overflown, don't check lastSeen!
+	current := s.clock.Time()
 	if current > s.lastClock+1 {
 		s.lastClock = current - 1
 		s.tryAppend(fmt.Sprintf("clock: %d\n", s.lastClock))
 	}
 }
 
-// // record event clock ===> call it action clock
 func (s *Snapshotter) recordActionClock(lTime LamportTime) {
 	// Ignore old clocks
 	if lTime <= s.lastActionClock {
@@ -248,7 +237,6 @@ func (s *Snapshotter) recordActionClock(lTime LamportTime) {
 	s.tryAppend(fmt.Sprintf("action-clock: %d\n", lTime))
 }
 
-// // processQuery is used to handle a single query event
 func (s *Snapshotter) recordQueryClock(lTime LamportTime) {
 	// Ignore old clocks
 	if lTime <= s.lastQueryClock {
@@ -258,7 +246,6 @@ func (s *Snapshotter) recordQueryClock(lTime LamportTime) {
 	s.tryAppend(fmt.Sprintf("query-clock: %d\n", lTime))
 }
 
-// // write a line to buffer. compact if too large
 func (s *Snapshotter) appendLine(l string) error {
 	n, err := s.buffer.WriteString(l) // write to buffer
 	if err != nil {
@@ -272,7 +259,6 @@ func (s *Snapshotter) appendLine(l string) error {
 	return nil
 }
 
-// // tryAppend will invoke append line but will not return an error
 func (s *Snapshotter) tryAppend(l string) {
 	if err := s.appendLine(l); err != nil {
 		s.logger.Printf("[ERR] serf: Failed to update snapshot: %v", err)
@@ -294,7 +280,6 @@ func (s *Snapshotter) recover() {
 	}
 }
 
-// should be named snapshotThreshold
 // threshold = nodes * bytesPerNode * factor
 func (s *Snapshotter) snapshotThreshold() int64 {
 	nodes := int64(len(s.aliveNodes))
@@ -426,7 +411,7 @@ func (s *Snapshotter) handleLine(l string) {
 		}
 		addr := info[addrIdx+1:]
 		name := info[:addrIdx]
-		s.aliveNodes[name] = addr
+		s.aliveNodes[name] = addr // TODO: NOT USEFUL, AND MAY NOT CORRECTLY REFLECT THE NODES WHEN REJOIN. CONSIDER IGNORE!
 	case "not-alive: ":
 		delete(s.aliveNodes, info)
 	case "clock: ":

@@ -31,7 +31,10 @@ func decode(buf []byte, out interface{}) error {
 }
 
 func decodeTags(msg []byte) (map[string]string, error) {
-	if len(msg) == 0 || msg[0] != byte(tagMagicByte) {
+	if len(msg) == 0 {
+		return map[string]string{}, nil
+	}
+	if msg[0] != byte(tagMagicByte) {
 		return nil, fmt.Errorf("missing tag magic byte")
 	}
 	tags := make(map[string]string)

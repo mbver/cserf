@@ -13,6 +13,7 @@ type Serf struct {
 	config         *Config
 	inEventCh      chan Event
 	outEventCh     chan Event
+	nodeEventCh    chan *memberlist.NodeEvent
 	invokeScriptCh chan *invokeScript
 	eventHandlers  *eventHandlerManager
 	mlist          *memberlist.Memberlist
@@ -59,6 +60,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s := &Serf{}
 	s.config = b.conf
 	s.clock = &LamportClock{0}
+	s.logger = b.logger
 	s.shutdownCh = make(chan struct{})
 
 	s.inEventCh = make(chan Event, 1024)
@@ -72,9 +74,15 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.snapshot = snap // TODO: REPLAY?
-	s.outEventCh = outCh
+	s.snapshot = snap
 
+	outCh = NewMemberEventCoalescer(s.config.CoalesceInterval,
+		outCh,
+		s.logger,
+		s.shutdownCh,
+	)
+
+	s.outEventCh = outCh
 	// TODO: key event handlers to change outEventCh later
 
 	s.invokeScriptCh = make(chan *invokeScript)
@@ -86,6 +94,9 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	mbuilder.WithConfig(b.mconf)
 	mbuilder.WithLogger(b.logger)
 	mbuilder.WithKeyRing(b.keyring)
+
+	s.nodeEventCh = make(chan *memberlist.NodeEvent, 1024)
+	mbuilder.WithEventCh(s.nodeEventCh)
 
 	usrMsgCh := make(chan []byte)
 	s.userMsgCh = usrMsgCh
@@ -111,12 +122,12 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	}
 	s.mlist = m
 
-	s.logger = b.logger
 	s.query = newQueryManager(b.logger, b.conf.LBufferSize)
 	s.action = newActionManager(b.conf.LBufferSize)
 
-	go s.receiveMsgs()
+	go s.receiveNodeEvents()
 	go s.receiveEvents()
+	go s.receiveMsgs()
 	go s.receiveInvokeScripts()
 
 	return s, nil

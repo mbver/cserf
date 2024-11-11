@@ -71,6 +71,10 @@ func testNode(tags map[string]string) (*Serf, func(), error) {
 	mconf.Label = "label"
 	b.WithMemberlistConfig(mconf)
 
+	prefix := fmt.Sprintf("serf-%s: ", mconf.BindAddr)
+	logger := log.New(os.Stderr, prefix, log.LstdFlags)
+	b.WithLogger(logger)
+
 	snapfile := strconv.Itoa(rand.Int())
 	conf := &Config{
 		EventScript:            testEventScript,
@@ -78,15 +82,16 @@ func testNode(tags map[string]string) (*Serf, func(), error) {
 		QueryTimeoutMult:       16,
 		SnapshotPath:           filepath.Join(os.TempDir(), snapfile),
 		SnapshotMinCompactSize: 128 * 1024,
+		CoalesceInterval:       5 * time.Millisecond,
 	} // fill in later
 
-	cleanup1 := combineCleanup(cleanup, func() { os.Remove(conf.SnapshotPath) })
+	cleanup1 := combineCleanup(cleanup, func() {
+		data, _ := os.ReadFile(conf.SnapshotPath)
+		logger.Printf("### snapshot %s:", string(data))
+		os.Remove(conf.SnapshotPath)
+	})
 
 	b.WithConfig(conf)
-
-	prefix := fmt.Sprintf("serf-%s: ", mconf.BindAddr)
-	logger := log.New(os.Stderr, prefix, log.LstdFlags)
-	b.WithLogger(logger)
 
 	b.WithTags(tags)
 
@@ -137,6 +142,9 @@ func TestMain(m *testing.M) {
 func TestSerf_Create(t *testing.T) {
 	_, cleanup, err := testNode(nil)
 	defer cleanup()
+	// wait a bit before shutdown.
+	// if we shutdown too soon, shutdownCh will race with nodeEventCh
+	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 }
 
@@ -151,6 +159,7 @@ func TestSerf_Join(t *testing.T) {
 	n, err := s1.Join([]string{addr})
 	require.Nil(t, err)
 	require.Equal(t, 1, n)
+	time.Sleep(10 * time.Millisecond)
 }
 
 func retry(times int, fn func() (bool, string)) (success bool, msg string) {

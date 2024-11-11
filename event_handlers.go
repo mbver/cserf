@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/armon/circbuf"
+	memberlist "github.com/mbver/mlist"
 )
 
 type EventHandler interface {
@@ -155,6 +156,48 @@ type StreamEventHandler struct {
 
 func (h *StreamEventHandler) HandleEvent(e Event) {}
 
+func nodeToMemberEvent(node *memberlist.NodeEvent) (*MemberEvent, error) {
+	var eType EventType
+	switch node.Type {
+	case memberlist.NodeJoin:
+		eType = EventMemberJoin
+	case memberlist.NodeLeave:
+		eType = EventMemberLeave
+	case memberlist.NodeUpdate:
+		eType = EventMemberUpdate
+	default:
+		return nil, fmt.Errorf("unknown member event")
+	}
+	return &MemberEvent{
+		Type: eType,
+		Member: &Member{
+			ID:   node.Node.ID,
+			IP:   node.Node.IP,
+			Port: node.Node.Port,
+			Tags: node.Node.Tags,
+		},
+	}, nil
+}
+
+// because inEventCh is buffered, so memberlist can start successfully
+// even the whole event pipeline is not started
+func (s *Serf) receiveNodeEvents() {
+	for {
+		select {
+		case e := <-s.nodeEventCh:
+			mEvent, err := nodeToMemberEvent(e)
+			if err != nil {
+				s.logger.Printf("[ERR] serf: error receiving node event %v", err)
+			}
+			s.inEventCh <- mEvent
+		case <-s.shutdownCh:
+			s.logger.Printf("[WARN] serf: serf shutdown, quitting receiving node events")
+			return
+		}
+
+	}
+}
+
 func (s *Serf) receiveEvents() {
 	for {
 		select {
@@ -231,14 +274,16 @@ func (s *Serf) invokeEventScript(script string, event Event) error {
 	}
 
 	switch e := event.(type) {
+	case *CoalescedMemberEvent:
+		go stdinMemberData(s.logger, stdin, e)
 	case *ActionEvent:
 		cmd.Env = append(cmd.Env, "SERF_ACTION_EVENT="+e.Name) // will be read by the script
 		cmd.Env = append(cmd.Env, fmt.Sprintf("SERF_ACTION_LTIME=%d", e.LTime))
-		go streamPayload(s.logger, stdin, e.Payload)
+		go stdinPayload(s.logger, stdin, e.Payload)
 	case *QueryEvent:
 		cmd.Env = append(cmd.Env, "SERF_QUERY_NAME="+e.Name)
 		cmd.Env = append(cmd.Env, fmt.Sprintf("SERF_QUERY_LTIME=%d", e.LTime))
-		go streamPayload(s.logger, stdin, e.Payload)
+		go stdinPayload(s.logger, stdin, e.Payload)
 	default:
 		return fmt.Errorf("unknown event type: %s", event.EventType().String())
 	}
@@ -276,8 +321,48 @@ func (s *Serf) invokeEventScript(script string, event Event) error {
 	return nil
 }
 
+func escapeWhiteSpace(s string) string {
+	s = strings.Replace(s, "\t", "\\t", -1)
+	s = strings.Replace(s, "\n", "\\n", -1)
+	return s
+}
+
+func decodeAndConcatTags(tags []byte) (map[string]string, string, error) {
+	m, err := decodeTags(tags)
+	if err != nil {
+		return nil, "", err
+	}
+	kvs := []string{}
+	for k, v := range m {
+		kvs = append(kvs, fmt.Sprintf("%s=%s", k, v))
+	}
+	return m, strings.Join(kvs, ","), nil
+}
+
+func stdinMemberData(logger *log.Logger, stdin io.WriteCloser, e *CoalescedMemberEvent) {
+	defer stdin.Close()
+	for _, m := range e.Members {
+		tagMap, tags, err := decodeAndConcatTags(m.Tags)
+		if err != nil {
+			logger.Printf("[ERR] serf invoke-event-script: failed to decode tags %v", err)
+			return
+		}
+		_, err = stdin.Write([]byte(fmt.Sprintf(
+			"%s\t%s\t%s\t%s\n",
+			m.ID,
+			m.IP.String(),
+			escapeWhiteSpace(tagMap["role"]),
+			escapeWhiteSpace(tags),
+		)))
+		if err != nil {
+			logger.Printf("[ERR] serf invoke-event-script: failed to stream member data to sdin")
+			return
+		}
+	}
+}
+
 // send payload so the script can read it
-func streamPayload(logger *log.Logger, stdin io.WriteCloser, buf []byte) {
+func stdinPayload(logger *log.Logger, stdin io.WriteCloser, buf []byte) {
 	defer stdin.Close()
 
 	// Append a newline to payload if missing
