@@ -34,7 +34,9 @@ func catchDimensionPanic(f func(), ch chan bool) {
 				return
 			}
 			ch <- errors.Is(err, ErrDimMisMatch)
+			return
 		}
+		ch <- false
 	}()
 	f()
 }

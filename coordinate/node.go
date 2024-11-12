@@ -51,13 +51,15 @@ func (r *latencyRing) median() float64 {
 	return tmp[len(tmp)/2]
 }
 
-// specially use for only adjustment
-func (r *latencyRing) avg() float64 {
+// if adjustment is calculated from len(r.latencies),
+// the initial relaxations can cause large latency differences.
+// that can affect the convergence of circle topology test.
+func getAdjustment(r *latencyRing) float64 {
 	sum := 0.0
 	for _, l := range r.latencies {
 		sum += l
 	}
-	return sum / float64(r.size)
+	return sum / (float64(r.size) * 2.0)
 }
 
 type Node struct {
@@ -88,43 +90,43 @@ func NewNode(config *Config) (*Node, error) {
 	}, nil
 }
 
-func (c *Node) GetCoordinate() *Coordinate {
-	c.l.RLock()
-	defer c.l.RUnlock()
+func (n *Node) GetCoordinate() *Coordinate {
+	n.l.RLock()
+	defer n.l.RUnlock()
 
-	return c.coord.Clone()
+	return n.coord.Clone()
 }
 
-func (c *Node) SetCoordinate(coord *Coordinate) error {
-	c.l.Lock()
-	defer c.l.Unlock()
+func (n *Node) SetCoordinate(coord *Coordinate) error {
+	n.l.Lock()
+	defer n.l.Unlock()
 
-	if err := c.checkCoordinate(coord); err != nil {
+	if err := n.checkCoordinate(coord); err != nil {
 		return err
 	}
-	c.coord = coord.Clone()
+	n.coord = coord.Clone()
 	return nil
 }
 
 // remove the node's latecy-ring from the latenciesMap
-func (c *Node) ForgetNode(node string) {
-	c.l.Lock()
-	defer c.l.Unlock()
+func (n *Node) ForgetNode(node string) {
+	n.l.Lock()
+	defer n.l.Unlock()
 
-	delete(c.latenciesMap, node)
+	delete(n.latenciesMap, node)
 }
 
 // Stats returns a copy of stats for the client.
-func (c *Node) NumResets() int {
-	c.l.Lock()
-	defer c.l.Unlock()
+func (n *Node) NumResets() int {
+	n.l.Lock()
+	defer n.l.Unlock()
 
-	return c.numResets
+	return n.numResets
 }
 
 // check if the coordinate is valid for this client
-func (c *Node) checkCoordinate(coord *Coordinate) error {
-	if !matchDim(c.coord, coord) {
+func (n *Node) checkCoordinate(coord *Coordinate) error {
+	if !matchDim(n.coord, coord) {
 		return fmt.Errorf("dimensions aren't compatible")
 	}
 
@@ -136,91 +138,91 @@ func (c *Node) checkCoordinate(coord *Coordinate) error {
 }
 
 // add new value to node's latency-ring and get its median value
-func (c *Node) addLatency(node string, rttSeconds float64) float64 {
-	samples, ok := c.latenciesMap[node]
+func (n *Node) addLatency(node string, rttSeconds float64) float64 {
+	samples, ok := n.latenciesMap[node]
 	if !ok {
-		samples = newLatencyRing(c.config.LatencyFilterSize)
+		samples = newLatencyRing(n.config.LatencyFilterSize)
 	}
 	samples.add(rttSeconds)
 	return samples.median()
 }
 
 // given from-coord and rtt, apply force to current coord to move it to balance
-func (c *Node) relax(from *Coordinate, rttSeconds float64) {
+func (n *Node) relax(from *Coordinate, rttSeconds float64) {
 
-	dist := TimeDist(c.coord, from).Seconds()
+	dist := TimeDist(n.coord, from).Seconds()
 	if rttSeconds < zeroThreshold {
 		rttSeconds = zeroThreshold
 	}
 	latDiff := rttSeconds - dist             // latency difference
 	latDev := math.Abs(latDiff) / rttSeconds // latency deviation
 
-	totalError := c.coord.Error + from.Error
+	totalError := n.coord.Error + from.Error
 	if totalError < zeroThreshold {
 		totalError = zeroThreshold
 	}
-	errDev := c.coord.Error / totalError // error deviation
+	errDev := n.coord.Error / totalError // error deviation
 
 	// update new error
-	c.coord.Error += c.config.VivaldiCE * errDev * (latDev - c.coord.Error)
-	if c.coord.Error > c.config.VivaldiErrorMax {
-		c.coord.Error = c.config.VivaldiErrorMax
+	n.coord.Error += n.config.VivaldiCE * errDev * (latDev - n.coord.Error)
+	if n.coord.Error > n.config.VivaldiErrorMax {
+		n.coord.Error = n.config.VivaldiErrorMax
 	}
 
 	// apply force
-	force := c.config.VivaldiCC * errDev * latDiff
-	c.coord = ApplyForce(from, c.coord, c.config.HeightMin, force)
+	force := n.config.VivaldiCC * errDev * latDiff
+	n.coord = ApplyForce(from, n.coord, n.config.HeightMin, force)
 }
 
 // adjust happens after relaxation to correct
 // the discrepancy between coord-distance and real latency
-func (c *Node) adjust(other *Coordinate, rttSeconds float64) {
-	if c.config.AdjustmentWindowSize == 0 {
+func (n *Node) adjust(other *Coordinate, rttSeconds float64) {
+	if n.config.AdjustmentWindowSize == 0 {
 		return
 	}
 
-	latDiff := rttSeconds - distance(c.coord, other)
-	c.latenciesDiff.add(latDiff)
+	latDiff := rttSeconds - distance(n.coord, other)
+	n.latenciesDiff.add(latDiff)
 
-	c.coord.Adjustment = c.latenciesDiff.avg() / 2.0 // each node responsible for half latency diff
+	n.coord.Adjustment = getAdjustment(n.latenciesDiff) // each node responsible for half latency diff
 }
 
 // pull the coord slightly toward center
 // to combat drift
-func (c *Node) centerNudge() {
-	dist := TimeDist(c.origin, c.coord).Seconds()
-	force := -1.0 * math.Pow(dist/c.config.GravityRho, 2.0)
-	c.coord = ApplyForce(c.origin, c.coord.Clone(), c.config.HeightMin, force)
+func (n *Node) centerNudge() {
+	dist := TimeDist(n.origin, n.coord).Seconds()
+	force := -1.0 * math.Pow(dist/n.config.GravityRho, 2.0)
+	n.coord = ApplyForce(n.origin, n.coord.Clone(), n.config.HeightMin, force)
 }
 
 // update the current node's coordinate based on response from other node
-func (c *Node) Relax(node string, other *Coordinate, rtt time.Duration) (*Coordinate, error) {
-	c.l.Lock()
-	defer c.l.Unlock()
+func (n *Node) Relax(node string, other *Coordinate, rtt time.Duration) (*Coordinate, error) {
+	n.l.Lock()
+	defer n.l.Unlock()
 
-	if err := c.checkCoordinate(other); err != nil {
+	if err := n.checkCoordinate(other); err != nil {
 		return nil, err
 	}
 	if rtt < 0 || rtt > maxRTT {
 		return nil, fmt.Errorf("round trip time not in valid range, duration %v is not a positive value less than %v ", rtt, maxRTT)
 	}
-	rttSeconds := c.addLatency(node, rtt.Seconds())
-	c.relax(other, rttSeconds)
-	c.adjust(other, rttSeconds)
-	c.centerNudge()
+	rttSeconds := n.addLatency(node, rtt.Seconds())
+	n.relax(other, rttSeconds)
+	n.adjust(other, rttSeconds)
+	n.centerNudge()
 
-	if !isValidCoord(c.coord) { // drift too far!
-		c.numResets++
-		c.coord = NewCoordinate(c.config)
+	if !isValidCoord(n.coord) { // drift too far!
+		n.numResets++
+		n.coord = NewCoordinate(n.config)
 	}
 
-	return c.coord.Clone(), nil
+	return n.coord.Clone(), nil
 }
 
 // coordinate for another node.
-func (c *Node) DistanceTo(other *Coordinate) time.Duration {
-	c.l.RLock()
-	defer c.l.RUnlock()
+func (n *Node) DistanceTo(other *Coordinate) time.Duration {
+	n.l.RLock()
+	defer n.l.RUnlock()
 
-	return TimeDist(c.coord, other)
+	return TimeDist(n.coord, other)
 }
