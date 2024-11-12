@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
 	"os/exec"
 	"regexp"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/armon/circbuf"
-	memberlist "github.com/mbver/mlist"
 )
 
 type EventHandler interface {
@@ -70,6 +68,46 @@ func isValidEventFilter(f *eventFilter) bool {
 		etype == "query" || etype == "*"
 }
 
+type streamEventHandlerManager struct {
+	l           sync.Mutex
+	handlerMap  map[*StreamEventHandler]struct{} // for register/deregister
+	handlerList []*StreamEventHandler            // for read access
+}
+
+func (m *streamEventHandlerManager) handleEvent(e Event) {
+	m.l.Lock()
+	handlers := m.handlerList
+	m.l.Unlock()
+	for _, h := range handlers {
+		h.HandleEvent(e)
+	}
+}
+
+func (m *streamEventHandlerManager) register(h *StreamEventHandler) {
+	m.l.Lock()
+	defer m.l.Unlock()
+	m.handlerMap[h] = struct{}{}
+	m.handlerList = make([]*StreamEventHandler, 0, len(m.handlerMap))
+	for h := range m.handlerMap {
+		m.handlerList = append(m.handlerList, h)
+	}
+}
+
+func (m *streamEventHandlerManager) deregister(h *StreamEventHandler) {
+	m.l.Lock()
+	defer m.l.Unlock()
+	delete(m.handlerMap, h)
+	m.handlerList = make([]*StreamEventHandler, 0, len(m.handlerMap))
+	for h := range m.handlerMap {
+		m.handlerList = append(m.handlerList, h)
+	}
+}
+
+type StreamEventHandler struct {
+}
+
+func (h *StreamEventHandler) HandleEvent(e Event) {}
+
 type scriptEventHandlerManager struct {
 	l           sync.Mutex
 	handlers    []*ScriptEventHandler
@@ -113,88 +151,6 @@ func (h *ScriptEventHandler) HandleEvent(e Event) {
 			event:  e,
 			script: h.script,
 		}
-	}
-}
-
-type streamEventHandlerManager struct {
-	l           sync.Mutex
-	handlerMap  map[*StreamEventHandler]struct{} // for register/deregister
-	handlerList []*StreamEventHandler            // for read access
-}
-
-func (m *streamEventHandlerManager) handleEvent(e Event) {
-	m.l.Lock()
-	handlers := m.handlerList
-	m.l.Unlock()
-	for _, h := range handlers {
-		h.HandleEvent(e)
-	}
-}
-
-func (m *streamEventHandlerManager) register(h *StreamEventHandler) {
-	m.l.Lock()
-	defer m.l.Unlock()
-	m.handlerMap[h] = struct{}{}
-	m.handlerList = make([]*StreamEventHandler, 0, len(m.handlerMap))
-	for h := range m.handlerMap {
-		m.handlerList = append(m.handlerList, h)
-	}
-}
-
-func (m *streamEventHandlerManager) deregister(h *StreamEventHandler) {
-	m.l.Lock()
-	defer m.l.Unlock()
-	delete(m.handlerMap, h)
-	m.handlerList = make([]*StreamEventHandler, 0, len(m.handlerMap))
-	for h := range m.handlerMap {
-		m.handlerList = append(m.handlerList, h)
-	}
-}
-
-type StreamEventHandler struct {
-}
-
-func (h *StreamEventHandler) HandleEvent(e Event) {}
-
-func nodeToMemberEvent(node *memberlist.NodeEvent) (*MemberEvent, error) {
-	var eType EventType
-	switch node.Type {
-	case memberlist.NodeJoin:
-		eType = EventMemberJoin
-	case memberlist.NodeLeave:
-		eType = EventMemberLeave
-	case memberlist.NodeUpdate:
-		eType = EventMemberUpdate
-	default:
-		return nil, fmt.Errorf("unknown member event")
-	}
-	return &MemberEvent{
-		Type: eType,
-		Member: &Member{
-			ID:   node.Node.ID,
-			IP:   node.Node.IP,
-			Port: node.Node.Port,
-			Tags: node.Node.Tags,
-		},
-	}, nil
-}
-
-// because inEventCh is buffered, so memberlist can start successfully
-// even the whole event pipeline is not started
-func (s *Serf) receiveNodeEvents() {
-	for {
-		select {
-		case e := <-s.nodeEventCh:
-			mEvent, err := nodeToMemberEvent(e)
-			if err != nil {
-				s.logger.Printf("[ERR] serf: error receiving node event %v", err)
-			}
-			s.inEventCh <- mEvent
-		case <-s.shutdownCh:
-			s.logger.Printf("[WARN] serf: serf shutdown, quitting receiving node events")
-			return
-		}
-
 	}
 }
 
@@ -373,41 +329,6 @@ func stdinPayload(logger *log.Logger, stdin io.WriteCloser, buf []byte) {
 	if _, err := stdin.Write(buf); err != nil {
 		logger.Printf("[ERR] Error writing payload: %s", err)
 	}
-}
-
-var ErrQueryRespLimitExceed = fmt.Errorf("query response exceed limit")
-
-func (s *Serf) respondToQueryEvent(q *QueryEvent, output []byte) error {
-	resp := msgQueryResponse{
-		LTime:   q.LTime,
-		ID:      q.ID,
-		From:    s.mlist.ID(),
-		Payload: output,
-	}
-	msg, err := encode(msgQueryRespType, resp)
-	if err != nil {
-		s.logger.Printf("[ERR] serf: encode query response message failed")
-		return err
-	}
-	if len(msg) > s.config.QueryResponseSizeLimit {
-		s.logger.Printf("[ERR] serf: query response size exceed limit: %d", len(msg))
-		return ErrQueryRespLimitExceed
-	}
-	addr := net.UDPAddr{
-		IP:   q.SourceIP,
-		Port: int(q.SourcePort),
-	}
-	err = s.mlist.SendUserMsg(&addr, msg)
-	if err != nil {
-		s.logger.Printf("[ERR] serf: failed to send query response to %s", addr.String())
-		return err
-	}
-
-	if err := s.relay(int(q.NumRelays), msg, q.SourceIP, q.SourcePort, q.NodeID); err != nil {
-		s.logger.Printf("ERR serf: failed to relay query response to %s:%d", q.SourceIP, q.SourcePort)
-		return err
-	}
-	return nil
 }
 
 func parseEventFilter(s string) (*eventFilter, error) {

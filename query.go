@@ -1,12 +1,15 @@
 package serf
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"net"
 	"sync"
 	"time"
+
+	memberlist "github.com/mbver/mlist"
 )
 
 type QueryParam struct {
@@ -168,4 +171,87 @@ func (s *Serf) DefaultQueryTimeout() time.Duration {
 	n := s.mlist.GetNumNodes()
 	scale := math.Ceil(math.Log10(float64(n)+1)) * float64(s.config.QueryTimeoutMult)
 	return time.Duration(scale) * s.mlist.GossipInterval()
+}
+
+var ErrQueryRespLimitExceed = fmt.Errorf("query response exceed limit")
+
+func (s *Serf) respondToQueryEvent(q *QueryEvent, output []byte) error {
+	resp := msgQueryResponse{
+		LTime:   q.LTime,
+		ID:      q.ID,
+		From:    s.mlist.ID(),
+		Payload: output,
+	}
+	msg, err := encode(msgQueryRespType, resp)
+	if err != nil {
+		s.logger.Printf("[ERR] serf: encode query response message failed")
+		return err
+	}
+	if len(msg) > s.config.QueryResponseSizeLimit {
+		s.logger.Printf("[ERR] serf: query response size exceed limit: %d", len(msg))
+		return ErrQueryRespLimitExceed
+	}
+	addr := net.UDPAddr{
+		IP:   q.SourceIP,
+		Port: int(q.SourcePort),
+	}
+	err = s.mlist.SendUserMsg(&addr, msg)
+	if err != nil {
+		s.logger.Printf("[ERR] serf: failed to send query response to %s", addr.String())
+		return err
+	}
+
+	if err := s.relay(int(q.NumRelays), msg, q.SourceIP, q.SourcePort, q.NodeID); err != nil {
+		s.logger.Printf("ERR serf: failed to relay query response to %s:%d", q.SourceIP, q.SourcePort)
+		return err
+	}
+	return nil
+}
+
+func (s *Serf) relay(numRelay int, msg []byte, desIP net.IP, destPort uint16, destID string) error {
+	if numRelay == 0 {
+		return nil
+	}
+	if s.mlist.NumActive() < numRelay+2 { // too few nodes
+		return nil
+	}
+	r := msgRelay{
+		Msg:      msg,
+		DestIP:   desIP,
+		DestPort: destPort,
+	}
+	encoded, err := encode(msgRelayType, r)
+	if err != nil {
+		return err
+	}
+	nodes := s.pickRelayNodes(numRelay, destID)
+	for _, n := range nodes {
+		addr := &net.UDPAddr{
+			IP:   n.IP,
+			Port: int(n.Port),
+		}
+		s.mlist.SendUserMsg(addr, encoded)
+	}
+	return nil
+}
+
+func (s *Serf) pickRelayNodes(numNodes int, destID string) []*memberlist.Node {
+	nodes := s.mlist.ActiveNodes()
+	l := len(nodes)
+	picked := make([]*memberlist.Node, 0, numNodes)
+PICKNODE:
+	for i := 0; i < 3*l && len(picked) < numNodes; i++ {
+		idx := randIntN(l)
+		node := nodes[idx]
+		if node.ID == s.ID() || node.ID == destID {
+			continue
+		}
+		for j := 0; j < len(picked); j++ {
+			if node.ID == picked[j].ID {
+				continue PICKNODE
+			}
+		}
+		picked = append(picked, node)
+	}
+	return picked
 }

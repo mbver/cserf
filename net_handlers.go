@@ -3,8 +3,6 @@ package serf
 import (
 	"net"
 	"regexp"
-
-	memberlist "github.com/mbver/mlist"
 )
 
 type msgType uint8
@@ -112,54 +110,6 @@ func (s *Serf) isQueryAccepted(q *msgQuery) bool {
 		}
 	}
 	return true
-}
-
-func (s *Serf) relay(numRelay int, msg []byte, desIP net.IP, destPort uint16, destID string) error {
-	if numRelay == 0 {
-		return nil
-	}
-	if s.mlist.NumActive() < numRelay+2 { // too few nodes
-		return nil
-	}
-	r := msgRelay{
-		Msg:      msg,
-		DestIP:   desIP,
-		DestPort: destPort,
-	}
-	encoded, err := encode(msgRelayType, r)
-	if err != nil {
-		return err
-	}
-	nodes := s.pickRelayNodes(numRelay, destID)
-	for _, n := range nodes {
-		addr := &net.UDPAddr{
-			IP:   n.IP,
-			Port: int(n.Port),
-		}
-		s.mlist.SendUserMsg(addr, encoded)
-	}
-	return nil
-}
-
-func (s *Serf) pickRelayNodes(numNodes int, destID string) []*memberlist.Node {
-	nodes := s.mlist.ActiveNodes()
-	l := len(nodes)
-	picked := make([]*memberlist.Node, 0, numNodes)
-PICKNODE:
-	for i := 0; i < 3*l && len(picked) < numNodes; i++ {
-		idx := randIntN(l)
-		node := nodes[idx]
-		if node.ID == s.ID() || node.ID == destID {
-			continue
-		}
-		for j := 0; j < len(picked); j++ {
-			if node.ID == picked[j].ID {
-				continue PICKNODE
-			}
-		}
-		picked = append(picked, node)
-	}
-	return picked
 }
 
 func (s *Serf) handleQueryResponse(msg []byte) {
