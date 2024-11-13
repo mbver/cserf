@@ -134,6 +134,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 		s.logger,
 		s.handleAction,
 	)
+	mbuilder.WithUserStateDelegate(s.usrState)
 
 	s.tags = make(map[string]string)
 	if len(b.tags) != 0 {

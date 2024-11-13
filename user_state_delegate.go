@@ -8,7 +8,7 @@ import (
 type messageUserState struct {
 	LTime        LamportTime
 	ActionLTime  LamportTime
-	ActionBuffer []*lGroupItem
+	ActionBuffer []lGroupItem
 	QueryLTime   LamportTime
 }
 
@@ -78,7 +78,7 @@ func (u *userStateDelegate) Merge(buf []byte) {
 		return
 	}
 	var msg messageUserState
-	err := decode(buf[1:], msg)
+	err := decode(buf[1:], &msg)
 	if err != nil {
 		u.logger.Printf("[ERR] serf: user state delegate: failed to decode user state message %v", err)
 		return
@@ -101,9 +101,6 @@ func (u *userStateDelegate) Merge(buf []byte) {
 	// replay actions
 	var msgAct msgAction
 	for _, group := range msg.ActionBuffer {
-		if group == nil { // can this happen?
-			continue
-		}
 		msgAct.LTime = group.LTime
 		for _, item := range group.Items {
 			msgAct.ID = item.ID

@@ -38,12 +38,15 @@ func (m *ActionManager) addToBuffer(msg *msgAction) (succcess bool) {
 	return m.buffers.addItem(m.clock.Time(), item)
 }
 
-func (m *ActionManager) getBuffer() []*lGroupItem {
+func (m *ActionManager) getBuffer() []lGroupItem {
 	m.l.Lock()
 	defer m.l.Unlock()
-	res := make([]*lGroupItem, len(m.buffers))
+	res := make([]lGroupItem, len(m.buffers))
 	for i, group := range m.buffers {
-		res[i] = &lGroupItem{
+		if group == nil {
+			continue
+		}
+		res[i] = lGroupItem{
 			LTime: group.LTime,
 			Items: make([]*lItem, len(group.Items)),
 		}
