@@ -13,6 +13,7 @@ const (
 	msgRelayType
 	msgActionType
 	msgKeyRespType
+	msgCoordType
 )
 
 func (t msgType) Code() int {
@@ -79,7 +80,6 @@ func (s *Serf) handleQuery(msg []byte) {
 		return
 	}
 
-	// TODO: this will be removed because it the QueryEvent will do the respond further down the pipeline
 	s.inEventCh <- &QueryEvent{
 		Name:       q.Name,
 		LTime:      q.LTime,

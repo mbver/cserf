@@ -19,6 +19,7 @@ type Serf struct {
 	invokeScriptCh chan *invokeScript
 	eventHandlers  *eventHandlerManager
 	mlist          *memberlist.Memberlist
+	ping           *pingDelegate
 	broadcasts     *broadcastManager
 	clock          *LamportClock
 	query          *QueryManager
@@ -115,6 +116,13 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.broadcasts = broadcasts
 	mbuilder.WithUserBroadcasts(broadcasts)
 
+	ping, err := newPingDelegate(b.logger)
+	if err != nil {
+		return nil, err
+	}
+	s.ping = ping
+	mbuilder.WithPingDelegate(ping)
+
 	s.tags = make(map[string]string)
 	if len(b.tags) != 0 {
 		encoded, err := encodeTags(s.tags)
@@ -130,6 +138,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 		return nil, err
 	}
 	s.mlist = m
+	s.ping.id = m.ID()
 
 	s.query = newQueryManager(b.logger, b.conf.LBufferSize)
 	s.action = newActionManager(b.conf.LBufferSize)
