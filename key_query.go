@@ -2,7 +2,9 @@ package serf
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"os"
 )
 
 const (
@@ -166,6 +168,9 @@ func (s *Serf) handleKeyQuery(q *QueryEvent) {
 		if err = s.keyring.AddKey(key); err != nil {
 			return
 		}
+		if err = s.writeKeyringFile(); err != nil {
+			return
+		}
 	case useKey:
 		if err = s.keyring.UseKey(key); err != nil {
 			return
@@ -179,12 +184,30 @@ func (s *Serf) handleKeyQuery(q *QueryEvent) {
 		return
 	}
 
-	// TODO: implement this
-	// if err = s.serf.writeKeyringFile(); err != nil {
-	// 	return
-	// }
 	resp.Success = true
 
+}
+
+func (s *Serf) writeKeyringFile() error {
+	if s.config.KeyringFile == "" {
+		return nil
+	}
+	keys := s.keyring.GetKeys()
+	encoded := make([]string, len(keys))
+
+	for i, key := range keys {
+		encoded[i] = base64.StdEncoding.EncodeToString(key)
+	}
+	jsonEncoded, err := json.MarshalIndent(encoded, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to encode keys: %s", err)
+	}
+	// Use 0600 for permissions because key data is sensitive
+	if err = os.WriteFile(s.config.KeyringFile, jsonEncoded, 0600); err != nil {
+		return fmt.Errorf("failed to write keyring file: %s", err)
+	}
+	// Success!
+	return nil
 }
 
 func (s *Serf) handleListKey(q *QueryEvent) {

@@ -12,4 +12,5 @@ type Config struct {
 	SnapshotMinCompactSize int
 	SnapshotDrainTimeout   time.Duration
 	CoalesceInterval       time.Duration
+	KeyringFile            string
 } // TODO: broadcast timeout should inject to memberlist config
