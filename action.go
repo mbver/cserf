@@ -30,8 +30,43 @@ func newActionManager(bufferSize int) *ActionManager {
 func (m *ActionManager) addToBuffer(msg *msgAction) (succcess bool) {
 	m.l.Lock()
 	defer m.l.Unlock()
-	item := &lItem{msg.LTime, msg.ID}
+	item := &lItem{
+		LTime:   msg.LTime,
+		ID:      msg.ID,
+		Payload: msg.Payload,
+	}
 	return m.buffers.addItem(m.clock.Time(), item)
+}
+
+func (m *ActionManager) getBuffer() []*lGroupItem {
+	m.l.Lock()
+	defer m.l.Unlock()
+	res := make([]*lGroupItem, len(m.buffers))
+	for i, group := range m.buffers {
+		res[i] = &lGroupItem{
+			LTime: group.LTime,
+			Items: make([]*lItem, len(group.Items)),
+		}
+		for j, item := range group.Items {
+			res[i].Items[j] = &lItem{
+				LTime: item.LTime,
+				ID:    item.ID,
+			}
+		}
+	}
+	return res
+}
+
+func (m *ActionManager) setActionMinTime(lTime LamportTime) {
+	m.l.Lock()
+	defer m.l.Unlock()
+	m.actionMinTime = lTime
+}
+
+func (m *ActionManager) getActionMinTime() LamportTime {
+	m.l.Lock()
+	defer m.l.Unlock()
+	return m.actionMinTime
 }
 
 // trigger a cluster action on all nodes

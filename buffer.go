@@ -1,21 +1,22 @@
 package serf
 
 type lItem struct {
-	ltime LamportTime
-	id    uint32
+	LTime   LamportTime
+	ID      uint32
+	Payload []byte
 }
 
 func (l *lItem) Equal(item *lItem) bool {
-	return l.ltime == item.ltime && l.id == item.id
+	return l.LTime == item.LTime && l.ID == item.ID
 }
 
 type lGroupItem struct {
-	items []*lItem
+	Items []*lItem
 	LTime LamportTime
 }
 
 func (g *lGroupItem) has(item *lItem) bool {
-	for _, i := range g.items {
+	for _, i := range g.Items {
 		if i.Equal(item) {
 			return true
 		}
@@ -24,7 +25,7 @@ func (g *lGroupItem) has(item *lItem) bool {
 }
 
 func (g *lGroupItem) add(item *lItem) {
-	g.items = append(g.items, item)
+	g.Items = append(g.Items, item)
 }
 
 type lBuffer []*lGroupItem
@@ -37,7 +38,7 @@ func (b *lBuffer) isTooOld(currentTime LamportTime, item *lItem) bool {
 	if currentTime <= b.len() {
 		return false
 	}
-	return item.ltime < currentTime-b.len()
+	return item.LTime < currentTime-b.len()
 }
 
 func (b *lBuffer) isLTimeNew(t LamportTime) bool {
@@ -47,10 +48,10 @@ func (b *lBuffer) isLTimeNew(t LamportTime) bool {
 }
 
 func (b *lBuffer) addNewLTime(item *lItem) {
-	idx := item.ltime % b.len()
+	idx := item.LTime % b.len()
 	(*b)[idx] = &lGroupItem{
-		items: []*lItem{item},
-		LTime: item.ltime,
+		Items: []*lItem{item},
+		LTime: item.LTime,
 	}
 }
 
@@ -58,11 +59,11 @@ func (b *lBuffer) addItem(currentTime LamportTime, item *lItem) bool {
 	if b.isTooOld(currentTime, item) {
 		return false
 	}
-	if b.isLTimeNew(item.ltime) {
+	if b.isLTimeNew(item.LTime) {
 		b.addNewLTime(item)
 		return true
 	}
-	idx := item.ltime % b.len()
+	idx := item.LTime % b.len()
 	group := (*b)[idx]
 	if group.has(item) {
 		return false

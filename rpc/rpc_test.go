@@ -222,7 +222,7 @@ func TestRPC_Query(t *testing.T) {
 	addr3, err := s3.AdvertiseAddress()
 	require.Nil(t, err)
 
-	n, err := s1.Join([]string{addr2, addr3})
+	n, err := s1.Join([]string{addr2, addr3}, false)
 	require.Nil(t, err)
 	require.Equal(t, 2, n)
 

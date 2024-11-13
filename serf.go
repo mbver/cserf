@@ -20,6 +20,7 @@ type Serf struct {
 	eventHandlers  *eventHandlerManager
 	mlist          *memberlist.Memberlist
 	ping           *pingDelegate
+	usrState       *userStateDelegate
 	broadcasts     *broadcastManager
 	clock          *LamportClock
 	query          *QueryManager
@@ -123,6 +124,17 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.ping = ping
 	mbuilder.WithPingDelegate(ping)
 
+	s.query = newQueryManager(b.logger, b.conf.LBufferSize)
+	s.action = newActionManager(b.conf.LBufferSize)
+
+	s.usrState = newUserStateDelegate( // will not be used until memberlist join some nodes
+		s.clock,
+		s.query.clock,
+		s.action,
+		s.logger,
+		s.handleAction,
+	)
+
 	s.tags = make(map[string]string)
 	if len(b.tags) != 0 {
 		encoded, err := encodeTags(s.tags)
@@ -140,9 +152,6 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.mlist = m
 	s.ping.id = m.ID()
 
-	s.query = newQueryManager(b.logger, b.conf.LBufferSize)
-	s.action = newActionManager(b.conf.LBufferSize)
-
 	go s.receiveNodeEvents()
 	go s.receiveKeyEvents()
 	go s.receiveEvents()
@@ -152,7 +161,10 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	return s, nil
 }
 
-func (s *Serf) Join(existing []string) (int, error) {
+func (s *Serf) Join(existing []string, ignoreOld bool) (int, error) {
+	s.usrState.setIgnoreActionsOnJoin(ignoreOld)
+	s.usrState.setJoin(true)
+	defer s.usrState.setJoin(false)
 	return s.mlist.Join(existing)
 }
 

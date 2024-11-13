@@ -121,7 +121,10 @@ func (m *QueryManager) invokeResponseHandler(r *msgQueryResponse) {
 func (m *QueryManager) addToBuffer(msg *msgQuery) (success bool) {
 	m.l.Lock()
 	defer m.l.Unlock()
-	item := &lItem{msg.LTime, msg.ID}
+	item := &lItem{
+		LTime: msg.LTime,
+		ID:    msg.ID,
+	}
 	return m.buffers.addItem(m.clock.Time(), item)
 }
 

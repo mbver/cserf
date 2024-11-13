@@ -158,7 +158,7 @@ func TestSerf_Join(t *testing.T) {
 	addr, err := s2.AdvertiseAddress()
 	require.Nil(t, err)
 
-	n, err := s1.Join([]string{addr})
+	n, err := s1.Join([]string{addr}, false)
 	require.Nil(t, err)
 	require.Equal(t, 1, n)
 	time.Sleep(10 * time.Millisecond)

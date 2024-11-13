@@ -14,6 +14,7 @@ const (
 	msgActionType
 	msgKeyRespType
 	msgCoordType
+	msgUsrStateType
 )
 
 func (t msgType) Code() int {
