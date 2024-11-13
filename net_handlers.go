@@ -3,6 +3,7 @@ package serf
 import (
 	"net"
 	"regexp"
+	"time"
 )
 
 type msgType uint8
@@ -90,6 +91,7 @@ func (s *Serf) handleQuery(msg []byte) {
 		NodeID:     q.NodeID,
 		NumRelays:  q.NumRelays,
 		Payload:    q.Payload,
+		Deadline:   time.Now().Add(q.Timeout),
 	}
 }
 

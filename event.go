@@ -3,6 +3,7 @@ package serf
 import (
 	"fmt"
 	"net"
+	"time"
 )
 
 type Event interface {
@@ -51,6 +52,7 @@ type QueryEvent struct {
 	NodeID     string
 	NumRelays  uint8
 	Payload    []byte
+	Deadline   time.Time
 }
 
 func (q *QueryEvent) EventType() EventType {

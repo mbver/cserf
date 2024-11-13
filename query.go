@@ -37,6 +37,7 @@ type msgQuery struct {
 	FilterTags []FilterTag `codec:",omitempty"`
 	NumRelays  uint8
 	Payload    []byte
+	Timeout    time.Duration
 }
 
 type msgQueryResponse struct {
@@ -153,6 +154,7 @@ func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) error {
 		FilterTags: params.FilterTags,
 		NumRelays:  params.NumRelays,
 		Payload:    params.Payload,
+		Timeout:    params.Timeout,
 	}
 	s.query.setResponseHandler(q.LTime, q.ID, resCh, params.Timeout) // TODO: have it as input or config value
 	// handle query locally
@@ -176,9 +178,13 @@ func (s *Serf) DefaultQueryTimeout() time.Duration {
 	return time.Duration(scale) * s.mlist.GossipInterval()
 }
 
-var ErrQueryRespLimitExceed = fmt.Errorf("query response exceed limit")
+var ErrQueryRespLimitExceed = fmt.Errorf("query response exceeds size limit")
+var ErrQueryDeadlineExceed = fmt.Errorf("query deadline exceeded")
 
 func (s *Serf) respondToQueryEvent(q *QueryEvent, output []byte) error {
+	if time.Now().After(q.Deadline) {
+		return ErrQueryDeadlineExceed
+	}
 	resp := msgQueryResponse{
 		LTime:   q.LTime,
 		ID:      q.ID,
