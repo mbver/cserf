@@ -3,12 +3,14 @@ package serf
 import memberlist "github.com/mbver/mlist"
 
 type broadcastManager struct {
+	maxQueueDepth    int
 	actionBroadcasts *memberlist.TransmitCapQueue
 	queryBroadcasts  *memberlist.TransmitCapQueue
 }
 
-func newBroadcastManager(numNodes func() int, transmitScale int) *broadcastManager {
+func newBroadcastManager(numNodes func() int, transmitScale int, maxQueueDepth int) *broadcastManager {
 	return &broadcastManager{
+		maxQueueDepth:    maxQueueDepth,
 		actionBroadcasts: memberlist.NewBroadcastQueue(numNodes, transmitScale),
 		queryBroadcasts:  memberlist.NewBroadcastQueue(numNodes, transmitScale),
 	}
@@ -38,4 +40,12 @@ func (m *broadcastManager) broadcastQuery(t msgType, msg msgQuery, notify chan s
 
 func (m *broadcastManager) broadcastAction(t msgType, msg msgAction, notify chan struct{}) {
 	m.actionBroadcasts.QueueMsg("", t, msg, notify)
+}
+
+func (m *broadcastManager) manageQueueDepth() {
+	if m.maxQueueDepth == 0 {
+		return
+	}
+	m.actionBroadcasts.Resize(m.maxQueueDepth)
+	m.queryBroadcasts.Resize(m.maxQueueDepth)
 }

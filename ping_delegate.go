@@ -67,6 +67,12 @@ func (p *pingDelegate) GetCachedCoord(id string) *coordinate.Coordinate {
 	return p.coordCache[id]
 }
 
+func (p *pingDelegate) RemoveCachedCoord(id string) {
+	p.cacheLock.Lock()
+	defer p.cacheLock.Unlock()
+	delete(p.coordCache, id)
+}
+
 func (s *Serf) GetCoordinate() *coordinate.Coordinate {
 	return s.ping.coord.GetCoordinate()
 }

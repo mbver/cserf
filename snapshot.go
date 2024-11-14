@@ -448,11 +448,6 @@ func (s *Snapshotter) replay() error {
 	return err
 }
 
-// LastClock returns the last known clock time
-func (s *Snapshotter) LastClock() LamportTime {
-	return s.lastClock
-}
-
 // returns the latest event time the snapshotter knows. should be named lastEventTime
 func (s *Snapshotter) LastActionClock() LamportTime {
 	return s.lastActionClock

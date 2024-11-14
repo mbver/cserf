@@ -3,7 +3,9 @@ package serf
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"sync"
+	"time"
 
 	memberlist "github.com/mbver/mlist"
 )
@@ -122,7 +124,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.userMsgCh = usrMsgCh
 	mbuilder.WithUserMessageCh(usrMsgCh)
 
-	broadcasts := newBroadcastManager(s.NumNodes, b.mconf.RetransmitMult) // TODO: add a logger then?
+	broadcasts := newBroadcastManager(s.NumNodes, b.mconf.RetransmitMult, b.conf.MaxQueueDepth) // TODO: add a logger then?
 	s.broadcasts = broadcasts
 	mbuilder.WithUserBroadcasts(broadcasts)
 
@@ -162,14 +164,15 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.ping.id = m.ID()
 
 	s.setState(SerfAlive)
-	s.inactive = newInactiveNodes()
+	s.inactive = newInactiveNodes(s.config.ReconnectTimeout, s.config.TombstoneTimeout)
 
+	s.schedule()
 	go s.receiveNodeEvents()
 	go s.receiveKeyEvents()
 	go s.receiveEvents()
 	go s.receiveInvokeScripts()
 	go s.receiveMsgs()
-
+	go s.rejoinSnapshot()
 	return s, nil
 }
 
@@ -183,6 +186,25 @@ func (s *Serf) Join(existing []string, ignoreOld bool) (int, error) {
 	return s.mlist.Join(existing)
 }
 
+// try to join 1 previously known-node
+func (s *Serf) rejoinSnapshot() {
+	prev := s.snapshot.AliveNodes()
+	if len(prev) == 0 {
+		return
+	}
+	for _, n := range prev {
+		if n.ID == s.ID() { // it will not happen as new node always has new id!
+			continue
+		}
+		_, err := s.mlist.Join([]string{n.Addr})
+		if err == nil {
+			s.logger.Printf("[INFO] serf: rejoined successfully previously known node")
+			return
+		}
+	}
+	s.logger.Printf("[WARN] serf: failed to join any previously known node")
+}
+
 func (s *Serf) Leave() error {
 	if s.hasLeft() {
 		return fmt.Errorf("already left")
@@ -191,7 +213,7 @@ func (s *Serf) Leave() error {
 		return fmt.Errorf("leave after shutdown")
 	}
 	s.setState(SerfLeft)
-	// TODO: snapshotter leave
+	s.snapshot.Leave()
 	return s.mlist.Leave()
 }
 
@@ -234,4 +256,31 @@ func (s *Serf) hasShutdown() bool {
 	s.stateL.Lock()
 	defer s.stateL.Unlock()
 	return s.state == SerfShutdown
+}
+
+func scheduleFunc(interval time.Duration, stopCh chan struct{}, f func()) {
+	t := time.NewTicker(interval)
+	jitter := time.Duration(uint64(rand.Int63()) % uint64(interval))
+	time.Sleep(jitter) // wait random fraction of interval to avoid thundering herd
+	for {
+		select {
+		case <-t.C:
+			f()
+		case <-stopCh:
+			t.Stop()
+			return
+		}
+	}
+}
+
+func (s *Serf) schedule() {
+	if s.config.ReapInterval > 0 {
+		go scheduleFunc(s.config.ReapInterval, s.shutdownCh, s.reap)
+	}
+	if s.config.ReconnectInterval > 0 {
+		go scheduleFunc(s.config.ReconnectInterval, s.shutdownCh, s.reconnect)
+	}
+	if s.config.ManageQueueDepthInterval > 0 {
+		go scheduleFunc(s.config.ManageQueueDepthInterval, s.shutdownCh, s.broadcasts.manageQueueDepth)
+	}
 }

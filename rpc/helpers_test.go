@@ -73,6 +73,7 @@ func testNode() (*serf.Serf, func(), error) {
 		SnapshotMinCompactSize: 128 * 1024,
 		SnapshotDrainTimeout:   10 * time.Millisecond,
 		CoalesceInterval:       5 * time.Millisecond,
+		MaxQueueDepth:          1024,
 	} // fill in later
 
 	cleanup1 := combineCleanup(cleanup, func() {
