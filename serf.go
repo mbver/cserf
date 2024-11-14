@@ -138,11 +138,16 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.query = newQueryManager(b.logger, b.conf.LBufferSize)
 	s.action = newActionManager(b.conf.LBufferSize)
 
+	s.setState(SerfAlive)
+	s.inactive = newInactiveNodes(s.config.ReconnectTimeout, s.config.TombstoneTimeout)
+
 	s.usrState = newUserStateDelegate( // will not be used until memberlist join some nodes
 		s.query.clock,
 		s.action,
 		s.logger,
 		s.handleAction,
+		s.inactive.getLeftNodes,
+		s.inactive.addLeftBatch,
 	)
 	mbuilder.WithUserStateDelegate(s.usrState)
 
@@ -165,9 +170,6 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	}
 	s.mlist = m
 	s.ping.id = m.ID()
-
-	s.setState(SerfAlive)
-	s.inactive = newInactiveNodes(s.config.ReconnectTimeout, s.config.TombstoneTimeout)
 
 	s.schedule()
 	go s.receiveNodeEvents()
@@ -221,10 +223,17 @@ func (s *Serf) Leave() error {
 }
 
 func (s *Serf) Shutdown() {
+	if s.hasShutdown() {
+		return
+	}
+	if !s.hasLeft() {
+		s.logger.Printf("[WARN] serf: Shutdown without a leave")
+	}
+	s.setState(SerfShutdown)
+
 	s.mlist.Shutdown()
 	close(s.shutdownCh)
 	s.snapshot.Wait()
-	s.setState(SerfShutdown)
 }
 
 func (s *Serf) NumNodes() int {

@@ -60,6 +60,32 @@ func (i *inactiveNodes) addLeft(n *memberlist.Node) {
 	i.leftMap[n.ID] = true
 }
 
+func (i *inactiveNodes) addLeftBatch(nodes ...*memberlist.Node) {
+	i.l.Lock()
+	defer i.l.Unlock()
+	for _, n := range nodes {
+		if i.leftMap[n.ID] {
+			return
+		}
+		l := &InActiveNode{
+			node: n,
+			time: time.Now(),
+		}
+		i.left = append(i.left, l)
+		i.leftMap[n.ID] = true
+	}
+}
+
+func (i *inactiveNodes) getLeftNodes() []*memberlist.Node {
+	i.l.Lock()
+	defer i.l.Unlock()
+	res := make([]*memberlist.Node, len(i.left))
+	for i, n := range i.left {
+		res[i] = n.node
+	}
+	return res
+}
+
 func removeFromList(nodes *[]*InActiveNode, id string) {
 	if len(*nodes) == 0 {
 		return

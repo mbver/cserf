@@ -3,12 +3,15 @@ package serf
 import (
 	"log"
 	"sync"
+
+	memberlist "github.com/mbver/mlist"
 )
 
 type messageUserState struct {
 	ActionLTime  LamportTime
 	ActionBuffer []lGroupItem
 	QueryLTime   LamportTime
+	LeftNodes    []*memberlist.Node
 }
 
 type userStateDelegate struct {
@@ -19,6 +22,8 @@ type userStateDelegate struct {
 	joinL               sync.Mutex
 	ignoreActionsOnJoin bool
 	handleAction        func([]byte)
+	getLeftNodes        func() []*memberlist.Node
+	mergeLeftNodes      func(...*memberlist.Node)
 }
 
 func newUserStateDelegate(
@@ -26,12 +31,16 @@ func newUserStateDelegate(
 	action *ActionManager,
 	logger *log.Logger,
 	handleAct func([]byte),
+	getLeftNodes func() []*memberlist.Node,
+	mergeLeftNodes func(...*memberlist.Node),
 ) *userStateDelegate {
 	return &userStateDelegate{
-		queryClock:   queryClock,
-		action:       action,
-		logger:       logger,
-		handleAction: handleAct,
+		queryClock:     queryClock,
+		action:         action,
+		logger:         logger,
+		handleAction:   handleAct,
+		getLeftNodes:   getLeftNodes,
+		mergeLeftNodes: mergeLeftNodes,
 	}
 }
 
@@ -58,6 +67,7 @@ func (u *userStateDelegate) LocalState() []byte {
 		ActionLTime:  u.action.clock.Time(),
 		ActionBuffer: u.action.getBuffer(),
 		QueryLTime:   u.queryClock.Time(),
+		LeftNodes:    u.getLeftNodes(),
 	}
 	encoded, err := encode(msgUsrStateType, msg)
 	if err != nil {
@@ -105,4 +115,5 @@ func (u *userStateDelegate) Merge(buf []byte) {
 			u.handleAction(encoded)
 		}
 	}
+	u.mergeLeftNodes(msg.LeftNodes...)
 }
