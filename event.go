@@ -3,7 +3,10 @@ package serf
 import (
 	"fmt"
 	"net"
+	"reflect"
 	"time"
+
+	memberlist "github.com/mbver/mlist"
 )
 
 type Event interface {
@@ -78,16 +81,25 @@ func (a *ActionEvent) String() string {
 	return fmt.Sprintf("action: %s", a.Name)
 }
 
-type Member struct {
-	ID   string
-	IP   net.IP
-	Port uint16
-	Tags []byte
-}
-
 type MemberEvent struct {
 	Type   EventType
-	Member *Member
+	Member *memberlist.Node
+}
+
+func (m *MemberEvent) Equal(other *MemberEvent) bool {
+	if other == nil {
+		return false
+	}
+	if m.Type != other.Type {
+		return false
+	}
+	if m.Member.ID != other.Member.ID {
+		return false
+	}
+	if m.Type != EventMemberUpdate {
+		return true
+	}
+	return reflect.DeepEqual(m.Member, other.Member)
 }
 
 func (m *MemberEvent) EventType() EventType {
@@ -100,7 +112,7 @@ func (m *MemberEvent) String() string {
 
 type CoalescedMemberEvent struct {
 	Type    EventType
-	Members []*Member
+	Members []*memberlist.Node
 }
 
 func (m *CoalescedMemberEvent) EventType() EventType {

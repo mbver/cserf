@@ -3,6 +3,8 @@ package serf
 import (
 	"log"
 	"time"
+
+	memberlist "github.com/mbver/mlist"
 )
 
 // coalesce: eventype, members ==> map, coalesce interval, inCh, outCh
@@ -10,7 +12,8 @@ type MemberEventCoalescer struct {
 	flushInterval time.Duration
 	inCh          chan Event
 	outCh         chan Event
-	eventMap      map[EventType][]*Member
+	newEvents     map[string]*MemberEvent
+	oldEvents     map[string]*MemberEvent // TODO: cleanup it periodically too?
 	logger        *log.Logger
 	shutdownCh    chan struct{}
 }
@@ -21,7 +24,8 @@ func NewMemberEventCoalescer(interval time.Duration, inCh chan Event, logger *lo
 		flushInterval: interval,
 		inCh:          inCh,
 		outCh:         outch,
-		eventMap:      make(map[EventType][]*Member),
+		oldEvents:     make(map[string]*MemberEvent),
+		newEvents:     make(map[string]*MemberEvent),
 		logger:        logger,
 		shutdownCh:    shutdownCh,
 	}
@@ -35,13 +39,26 @@ func isMemberEvent(t EventType) bool {
 }
 
 func (c *MemberEventCoalescer) flush() {
-	for t, members := range c.eventMap {
-		c.outCh <- &CoalescedMemberEvent{
-			Type:    t,
-			Members: members,
+	coalesced := make(map[EventType]*CoalescedMemberEvent)
+	for id, e := range c.newEvents {
+		if e.Equal(c.oldEvents[id]) {
+			continue
 		}
+		if _, ok := coalesced[e.Type]; !ok {
+			coalesced[e.Type] = &CoalescedMemberEvent{
+				Type:    e.Type,
+				Members: []*memberlist.Node{e.Member},
+			}
+			continue
+		}
+		coalesced[e.Type].Members = append(coalesced[e.Type].Members, e.Member)
+		c.oldEvents[id] = e
 	}
-	c.eventMap = make(map[EventType][]*Member) // clean up flushed events
+
+	for _, e := range coalesced {
+		c.outCh <- e
+	}
+	c.newEvents = make(map[string]*MemberEvent) // clean up flushed events
 }
 
 func (c *MemberEventCoalescer) coalesce() {
@@ -56,7 +73,7 @@ func (c *MemberEventCoalescer) coalesce() {
 				continue
 			}
 			mEvent := e.(*MemberEvent)
-			c.eventMap[etype] = append(c.eventMap[etype], mEvent.Member)
+			c.newEvents[mEvent.Member.ID] = mEvent
 		case <-flushTicker.C:
 			c.flush()
 		case <-c.shutdownCh:

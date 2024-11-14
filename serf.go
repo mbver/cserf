@@ -3,11 +3,20 @@ package serf
 import (
 	"fmt"
 	"log"
+	"sync"
 
 	memberlist "github.com/mbver/mlist"
 )
 
 const tagMagicByte msgType = 255
+
+type SerfStateType int
+
+const (
+	SerfAlive SerfStateType = iota
+	SerfLeft
+	SerfShutdown
+)
 
 type Serf struct {
 	config         *Config
@@ -27,6 +36,9 @@ type Serf struct {
 	action         *ActionManager
 	userMsgCh      chan []byte
 	logger         *log.Logger
+	state          SerfStateType
+	stateL         sync.Mutex
+	inactive       *inactiveNodes
 	snapshot       *Snapshotter
 	shutdownCh     chan struct{}
 	tags           map[string]string
@@ -153,6 +165,9 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.mlist = m
 	s.ping.id = m.ID()
 
+	s.setState(SerfAlive)
+	s.inactive = newInactiveNodes()
+
 	go s.receiveNodeEvents()
 	go s.receiveKeyEvents()
 	go s.receiveEvents()
@@ -165,15 +180,30 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 func (s *Serf) Join(existing []string, ignoreOld bool) (int, error) {
 	s.usrState.setIgnoreActionsOnJoin(ignoreOld)
 	s.usrState.setJoin(true)
-	defer s.usrState.setJoin(false)
+	defer func() {
+		s.usrState.setJoin(false)
+		s.usrState.setIgnoreActionsOnJoin(false)
+	}()
 	return s.mlist.Join(existing)
+}
+
+func (s *Serf) Leave() error {
+	if s.hasLeft() {
+		return fmt.Errorf("already left")
+	}
+	if s.hasShutdown() {
+		return fmt.Errorf("leave after shutdown")
+	}
+	s.setState(SerfLeft)
+	// TODO: snapshotter leave
+	return s.mlist.Leave()
 }
 
 func (s *Serf) Shutdown() {
 	s.mlist.Shutdown()
 	close(s.shutdownCh)
 	s.snapshot.Wait()
-	fmt.Println("time:", s.clock.Time())
+	s.setState(SerfShutdown)
 }
 
 func (s *Serf) NumNodes() int {
@@ -190,4 +220,22 @@ func (s *Serf) AdvertiseAddress() (string, error) {
 
 func (s *Serf) ID() string {
 	return s.mlist.ID()
+}
+
+func (s *Serf) setState(state SerfStateType) {
+	s.stateL.Lock()
+	defer s.stateL.Unlock()
+	s.state = state
+}
+
+func (s *Serf) hasLeft() bool {
+	s.stateL.Lock()
+	defer s.stateL.Unlock()
+	return s.state == SerfLeft
+}
+
+func (s *Serf) hasShutdown() bool {
+	s.stateL.Lock()
+	defer s.stateL.Unlock()
+	return s.state == SerfShutdown
 }
