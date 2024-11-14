@@ -15,8 +15,8 @@ type Config struct {
 	KeyringFile              string
 	ReapInterval             time.Duration
 	ReconnectInterval        time.Duration
-	ReconnectTimeout         time.Duration
-	TombstoneTimeout         time.Duration
+	ReconnectTimeout         time.Duration // to remove failed nodes
+	TombstoneTimeout         time.Duration // to remove left nodes
 	MaxQueueDepth            int
 	ManageQueueDepthInterval time.Duration
 } // TODO: broadcast timeout should inject to memberlist config

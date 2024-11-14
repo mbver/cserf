@@ -8,6 +8,7 @@ import (
 )
 
 type messageUserState struct {
+	From         string
 	ActionLTime  LamportTime
 	ActionBuffer []lGroupItem
 	QueryLTime   LamportTime
@@ -15,15 +16,16 @@ type messageUserState struct {
 }
 
 type userStateDelegate struct {
-	queryClock          *LamportClock
-	action              *ActionManager
-	logger              *log.Logger
-	joining             bool
-	joinL               sync.Mutex
-	ignoreActionsOnJoin bool
-	handleAction        func([]byte)
-	getLeftNodes        func() []*memberlist.Node
-	mergeLeftNodes      func(...*memberlist.Node)
+	addr            string
+	queryClock      *LamportClock
+	action          *ActionManager
+	logger          *log.Logger
+	joining         map[string]bool
+	ignoreActOnJoin map[string]bool
+	joinL           sync.Mutex
+	handleAction    func([]byte)
+	getLeftNodes    func() []*memberlist.Node
+	mergeLeftNodes  func(...*memberlist.Node)
 }
 
 func newUserStateDelegate(
@@ -44,26 +46,45 @@ func newUserStateDelegate(
 	}
 }
 
-func (u *userStateDelegate) isJoin() bool {
+func (u *userStateDelegate) isJoin(addr string) bool {
 	u.joinL.Lock()
 	defer u.joinL.Unlock()
-	return u.joining
+	return u.joining[addr]
 }
 
-func (u *userStateDelegate) setJoin(join bool) {
+func (u *userStateDelegate) isIgnoreActOnJoin(addr string) bool {
 	u.joinL.Lock()
 	defer u.joinL.Unlock()
-	u.joining = join
+	return u.ignoreActOnJoin[addr]
 }
 
-func (u *userStateDelegate) setIgnoreActionsOnJoin(ignore bool) {
+func (u *userStateDelegate) setJoin(addr string) {
 	u.joinL.Lock()
 	defer u.joinL.Unlock()
-	u.ignoreActionsOnJoin = ignore
+	u.joining[addr] = true
+}
+
+func (u *userStateDelegate) unsetJoin(addr string) {
+	u.joinL.Lock()
+	defer u.joinL.Unlock()
+	delete(u.joining, addr)
+}
+
+func (u *userStateDelegate) setIgnoreActOnJoin(addr string, ignore bool) {
+	u.joinL.Lock()
+	defer u.joinL.Unlock()
+	u.ignoreActOnJoin[addr] = ignore
+}
+
+func (u *userStateDelegate) unsetIgnoreActJoin(addr string) {
+	u.joinL.Lock()
+	defer u.joinL.Unlock()
+	delete(u.ignoreActOnJoin, addr)
 }
 
 func (u *userStateDelegate) LocalState() []byte {
 	msg := messageUserState{
+		From:         u.addr,
 		ActionLTime:  u.action.clock.Time(),
 		ActionBuffer: u.action.getBuffer(),
 		QueryLTime:   u.queryClock.Time(),
@@ -95,11 +116,13 @@ func (u *userStateDelegate) Merge(buf []byte) {
 		u.queryClock.Witness(msg.QueryLTime - 1)
 	}
 	// ignore actions on join
-	if u.isJoin() && u.ignoreActionsOnJoin {
+	if u.isJoin(msg.From) && u.isIgnoreActOnJoin(msg.From) {
 		if msg.ActionLTime > u.action.getActionMinTime() {
 			u.action.setActionMinTime(msg.ActionLTime)
 		}
 	}
+	u.unsetJoin(msg.From)
+	u.unsetIgnoreActJoin(msg.From)
 	// replay actions
 	var msgAct msgAction
 	for _, group := range msg.ActionBuffer {

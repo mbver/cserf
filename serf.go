@@ -171,6 +171,12 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.mlist = m
 	s.ping.id = m.ID()
 
+	addr, err := s.AdvertiseAddress()
+	if err == nil {
+		return nil, err
+	}
+	s.usrState.addr = addr
+
 	s.schedule()
 	go s.receiveNodeEvents()
 	go s.receiveKeyEvents()
@@ -182,11 +188,15 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 }
 
 func (s *Serf) Join(existing []string, ignoreOld bool) (int, error) {
-	s.usrState.setIgnoreActionsOnJoin(ignoreOld)
-	s.usrState.setJoin(true)
-	defer func() {
-		s.usrState.setJoin(false)
-		s.usrState.setIgnoreActionsOnJoin(false)
+	for _, addr := range existing {
+		s.usrState.setJoin(addr)
+		s.usrState.setIgnoreActOnJoin(addr, ignoreOld)
+	}
+	defer func() { // unset in case join fails
+		for _, addr := range existing {
+			s.usrState.unsetJoin(addr)
+			s.usrState.unsetIgnoreActJoin(addr)
+		}
 	}()
 	return s.mlist.Join(existing)
 }
