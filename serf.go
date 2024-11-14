@@ -31,7 +31,6 @@ type Serf struct {
 	ping           *pingDelegate
 	usrState       *userStateDelegate
 	broadcasts     *broadcastManager
-	clock          *LamportClock
 	query          *QueryManager
 	action         *ActionManager
 	userMsgCh      chan []byte
@@ -75,7 +74,6 @@ func (b *SerfBuilder) WithTags(tags map[string]string) {
 func (b *SerfBuilder) Build() (*Serf, error) {
 	s := &Serf{}
 	s.config = b.conf
-	s.clock = &LamportClock{0}
 	s.logger = b.logger
 	s.shutdownCh = make(chan struct{})
 
@@ -84,7 +82,6 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 		s.config.SnapshotMinCompactSize,
 		s.config.SnapshotDrainTimeout,
 		s.logger,
-		s.clock,
 		s.inEventCh,
 		s.shutdownCh,
 	)
@@ -140,7 +137,6 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.action = newActionManager(b.conf.LBufferSize)
 
 	s.usrState = newUserStateDelegate( // will not be used until memberlist join some nodes
-		s.clock,
 		s.query.clock,
 		s.action,
 		s.logger,

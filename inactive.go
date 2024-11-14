@@ -2,15 +2,21 @@ package serf
 
 import (
 	"sync"
+	"time"
 
 	memberlist "github.com/mbver/mlist"
 )
 
+type InActiveNode struct {
+	node *memberlist.Node
+	time time.Time
+}
+
 type inactiveNodes struct {
 	l         sync.Mutex
-	failed    []*memberlist.Node
+	failed    []*InActiveNode
 	failedMap map[string]bool
-	left      []*memberlist.Node
+	left      []*InActiveNode
 	leftMap   map[string]bool
 }
 
@@ -24,24 +30,38 @@ func newInactiveNodes() *inactiveNodes {
 func (i *inactiveNodes) addFail(n *memberlist.Node) {
 	i.l.Lock()
 	defer i.l.Unlock()
-	i.failed = append(i.failed, n)
+	f := &InActiveNode{
+		node: n,
+		time: time.Now(),
+	}
+	if i.failedMap[n.ID] {
+		return
+	}
+	i.failed = append(i.failed, f)
 	i.failedMap[n.ID] = true
 }
 
 func (i *inactiveNodes) addLeft(n *memberlist.Node) {
 	i.l.Lock()
 	defer i.l.Unlock()
-	i.left = append(i.left, n)
+	if i.leftMap[n.ID] {
+		return
+	}
+	l := &InActiveNode{
+		node: n,
+		time: time.Now(),
+	}
+	i.left = append(i.left, l)
 	i.leftMap[n.ID] = true
 }
 
-func removeNode(nodes *[]*memberlist.Node, id string) {
+func removeFromList(nodes *[]*InActiveNode, id string) {
 	if len(*nodes) == 0 {
 		return
 	}
 	var i int
 	for i = 0; i < len(*nodes); i++ {
-		if (*nodes)[i].ID == id {
+		if (*nodes)[i].node.ID == id {
 			break
 		}
 	}
@@ -59,10 +79,10 @@ func (i *inactiveNodes) handleAlive(id string) {
 	defer i.l.Unlock()
 	if i.failedMap[id] {
 		delete(i.failedMap, id)
-		removeNode(&i.failed, id)
+		removeFromList(&i.failed, id)
 	}
 	if i.leftMap[id] { // this will not happen. left node will join with new id!
 		delete(i.leftMap, id)
-		removeNode(&i.left, id)
+		removeFromList(&i.left, id)
 	}
 }

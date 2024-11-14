@@ -6,14 +6,12 @@ import (
 )
 
 type messageUserState struct {
-	LTime        LamportTime
 	ActionLTime  LamportTime
 	ActionBuffer []lGroupItem
 	QueryLTime   LamportTime
 }
 
 type userStateDelegate struct {
-	clock               *LamportClock
 	queryClock          *LamportClock
 	action              *ActionManager
 	logger              *log.Logger
@@ -24,14 +22,12 @@ type userStateDelegate struct {
 }
 
 func newUserStateDelegate(
-	clock *LamportClock,
 	queryClock *LamportClock,
 	action *ActionManager,
 	logger *log.Logger,
 	handleAct func([]byte),
 ) *userStateDelegate {
 	return &userStateDelegate{
-		clock:        clock,
 		queryClock:   queryClock,
 		action:       action,
 		logger:       logger,
@@ -59,7 +55,6 @@ func (u *userStateDelegate) setIgnoreActionsOnJoin(ignore bool) {
 
 func (u *userStateDelegate) LocalState() []byte {
 	msg := messageUserState{
-		LTime:        u.clock.Time(),
 		ActionLTime:  u.action.clock.Time(),
 		ActionBuffer: u.action.getBuffer(),
 		QueryLTime:   u.queryClock.Time(),
@@ -82,9 +77,6 @@ func (u *userStateDelegate) Merge(buf []byte) {
 	if err != nil {
 		u.logger.Printf("[ERR] serf: user state delegate: failed to decode user state message %v", err)
 		return
-	}
-	if msg.LTime > 0 {
-		u.clock.Witness(msg.LTime - 1)
 	}
 	if msg.ActionLTime > 0 {
 		u.action.clock.Witness(msg.ActionLTime - 1)

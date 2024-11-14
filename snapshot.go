@@ -28,7 +28,6 @@ var snapshotPrefixes = []string{"alive: ", "not alive: ", "clock: ", "action clo
 
 type Snapshotter struct {
 	aliveNodes      map[string]string
-	clock           *LamportClock
 	path            string
 	fh              *os.File
 	offset          int64
@@ -61,7 +60,6 @@ func NewSnapshotter(path string,
 	minCompactSize int,
 	drainTimeout time.Duration,
 	logger *log.Logger,
-	clock *LamportClock,
 	inCh chan Event,
 	shutdownCh chan struct{},
 ) (*Snapshotter, chan Event, error) {
@@ -80,7 +78,6 @@ func NewSnapshotter(path string,
 	// Create the snapshotter
 	snap := &Snapshotter{
 		aliveNodes:      make(map[string]string),
-		clock:           clock, // TODO: TRY REMOVE
 		path:            path,
 		fh:              fh,
 		buffer:          bufio.NewWriter(fh),
@@ -142,8 +139,6 @@ func (s *Snapshotter) teeEvents(inCh, outCh chan Event) {
 }
 
 func (s *Snapshotter) receiveEvents() {
-	clockTicker := time.NewTicker(clockUpdateInterval) // TODO: TRY REMOVE
-	defer clockTicker.Stop()
 
 	flushTicker := time.NewTicker(flushInterval)
 	defer flushTicker.Stop()
@@ -158,7 +153,6 @@ func (s *Snapshotter) receiveEvents() {
 	}()
 	// drain all events in teeCh
 	defer func() {
-		s.updateClock()
 		drainTimeout := time.After(s.drainTimeout)
 		for {
 			select {
@@ -180,8 +174,6 @@ func (s *Snapshotter) receiveEvents() {
 			}
 		case e := <-s.teeCh:
 			s.recordEvent(e)
-		case <-clockTicker.C: // TODO: TRY REMOVE
-			s.updateClock()
 		case <-flushTicker.C:
 			if err := s.buffer.Flush(); err != nil {
 				s.recover()
@@ -223,16 +215,6 @@ func (s *Snapshotter) recordMemberEvent(e *MemberEvent) {
 		m := e.Member
 		delete(s.aliveNodes, m.ID)
 		s.tryAppend(fmt.Sprintf("not-alive: %s\n", m.ID))
-	}
-	s.updateClock()
-}
-
-// TODO: consider remove
-func (s *Snapshotter) updateClock() {
-	current := s.clock.Time()
-	if current > s.lastClock+1 {
-		s.lastClock = current - 1
-		s.tryAppend(fmt.Sprintf("clock: %d\n", s.lastClock))
 	}
 }
 
