@@ -149,6 +149,9 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.tags = make(map[string]string)
 	if len(b.tags) != 0 {
 		encoded, err := encodeTags(s.tags)
+		if len(encoded) > memberlist.TagMaxSize {
+			return nil, memberlist.ErrMaxTagSizeExceed
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -283,4 +286,16 @@ func (s *Serf) schedule() {
 	if s.config.ManageQueueDepthInterval > 0 {
 		go scheduleFunc(s.config.ManageQueueDepthInterval, s.shutdownCh, s.broadcasts.manageQueueDepth)
 	}
+}
+
+func (s *Serf) SetTags(tags map[string]string) error {
+	s.tags = tags
+	encoded, err := encodeTags(s.tags)
+	if len(encoded) > memberlist.TagMaxSize { // no need, memberlist can do this!
+		return memberlist.ErrMaxTagSizeExceed
+	}
+	if err != nil {
+		return err
+	}
+	return s.mlist.UpdateTags(encoded)
 }

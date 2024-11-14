@@ -23,6 +23,8 @@ github.com/mbver/mlist v0.0.0-20241106061835-be7809b99b22 h1:nlTYz67xp5x0bmyyOWH
 github.com/mbver/mlist v0.0.0-20241106061835-be7809b99b22/go.mod h1:aJLdZCQSc7A6rOi7qyW9rNknsCMp0UKzcp66m2NAeNs=
 github.com/mbver/mlist v0.0.0-20241114090856-bb6f4ea29788 h1:Nkk9LV31bLmHxzGPIEmdL6fqM5bQhlScfkSVVhS7e10=
 github.com/mbver/mlist v0.0.0-20241114090856-bb6f4ea29788/go.mod h1:aJLdZCQSc7A6rOi7qyW9rNknsCMp0UKzcp66m2NAeNs=
+github.com/mbver/mlist v0.0.0-20241114093505-031df5a07cce h1:Q2JAKiQBFZnIxb0swl94Q503jiauVZD/SCq3ak2K9q0=
+github.com/mbver/mlist v0.0.0-20241114093505-031df5a07cce/go.mod h1:aJLdZCQSc7A6rOi7qyW9rNknsCMp0UKzcp66m2NAeNs=
 github.com/miekg/dns v1.1.62 h1:cN8OuEF1/x5Rq6Np+h1epln8OiyPWV+lROx9LxcGgIQ=
 github.com/miekg/dns v1.1.62/go.mod h1:mvDlcItzm+br7MToIKqkglaGhlFMHJ9DTNNWONWXbNQ=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
