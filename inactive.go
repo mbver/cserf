@@ -46,6 +46,22 @@ func (i *inactiveNodes) addFail(n *memberlist.Node) {
 	i.failedMap[n.ID] = true
 }
 
+func (i *inactiveNodes) removeFailed(id string) {
+	i.l.Lock()
+	defer i.l.Unlock()
+	if !i.failedMap[id] {
+		return
+	}
+	delete(i.failedMap, id)
+	removeFromList(&i.failed, id)
+}
+
+func (i *inactiveNodes) numFailed() int {
+	i.l.Lock()
+	defer i.l.Unlock()
+	return len(i.failed)
+}
+
 func (i *inactiveNodes) addLeft(n *memberlist.Node) {
 	i.l.Lock()
 	defer i.l.Unlock()
@@ -119,6 +135,9 @@ func (i *inactiveNodes) handleAlive(id string) {
 }
 
 func removeTimeouts(nodes *[]*InActiveNode, m map[string]bool, timeout time.Duration) []*memberlist.Node {
+	if timeout == 0 {
+		return nil
+	}
 	toRemove := []*memberlist.Node{}
 	for _, n := range *nodes {
 		if time.Since(n.time) >= timeout {
@@ -147,8 +166,8 @@ func (i *inactiveNodes) shouldConnect(total int) bool {
 	if numAlive == 0 {
 		numAlive = 1 // guard against zero divide
 	}
-	threshold := float32(len(i.failed)) / numAlive
-	return rand.Float32() > threshold
+	threshold := float32(len(i.failed)) / float32(numAlive)
+	return rand.Float32() < threshold
 }
 
 func (i *inactiveNodes) pickRandomFailed() *memberlist.Node {
@@ -174,6 +193,9 @@ func (s *Serf) reap() {
 }
 
 func (s *Serf) reconnect() {
+	if s.inactive.numFailed() == 0 {
+		return
+	}
 	if !s.inactive.shouldConnect(s.NumNodes()) {
 		s.logger.Printf("[DEBUG] serf: forgoing reconnect for random throttling")
 		return
@@ -184,5 +206,9 @@ func (s *Serf) reconnect() {
 	}
 	addr := node.UDPAddress().String()
 	s.logger.Printf("[INFO] serf: attempting reconnect to %s %s", node.ID, addr)
-	s.mlist.Join([]string{addr})
+	n, err := s.mlist.Join([]string{addr})
+	if err != nil || n != 1 {
+		return
+	}
+	s.inactive.removeFailed(node.ID) // successfully reconnect
 }

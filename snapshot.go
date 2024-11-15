@@ -210,7 +210,8 @@ func (s *Snapshotter) recordMemberEvent(e *MemberEvent) {
 		addr := net.TCPAddr{IP: m.IP, Port: int(m.Port)}
 		s.aliveNodes[m.ID] = addr.String()
 		s.tryAppend(fmt.Sprintf("alive: %s %s\n", m.ID, addr.String()))
-
+	case EventMemberFailed:
+		fallthrough
 	case EventMemberLeave:
 		m := e.Member
 		delete(s.aliveNodes, m.ID)
