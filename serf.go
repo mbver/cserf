@@ -296,6 +296,12 @@ func (s *Serf) setState(state SerfStateType) {
 	s.state = state
 }
 
+func (s *Serf) State() SerfStateType {
+	s.stateL.Lock()
+	defer s.stateL.Unlock()
+	return s.state
+}
+
 func (s *Serf) hasLeft() bool {
 	s.stateL.Lock()
 	defer s.stateL.Unlock()

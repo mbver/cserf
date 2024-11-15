@@ -544,3 +544,17 @@ func TestSerf_Role(t *testing.T) {
 	})
 	require.True(t, found, msg)
 }
+
+func TestSerf_State(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+	require.Equal(t, SerfAlive, s.State())
+
+	err = s.Leave()
+	require.Nil(t, err)
+	require.Equal(t, SerfLeft, s.State())
+
+	s.Shutdown()
+	require.Equal(t, SerfShutdown, s.State())
+}

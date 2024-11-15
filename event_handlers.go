@@ -249,7 +249,7 @@ func (s *Serf) invokeEventScript(script string, event Event) error {
 
 	// Start a timer to warn about slow handlers
 	slowTimer := time.AfterFunc(slowScriptTimeout, func() {
-		s.logger.Printf("[WARN] agent: Script '%s' slow, execution exceeding %v",
+		s.logger.Printf("[WARN] serf: Script '%s' slow, execution exceeding %v",
 			script, slowScriptTimeout)
 	})
 
@@ -262,11 +262,11 @@ func (s *Serf) invokeEventScript(script string, event Event) error {
 
 	// Warn if buffer is overritten
 	if output.TotalWritten() > output.Size() {
-		s.logger.Printf("[WARN] agent: Script '%s' generated %d bytes of output, truncated to %d",
+		s.logger.Printf("[WARN] serf: Script '%s' generated %d bytes of output, truncated to %d",
 			script, output.TotalWritten(), output.Size())
 	}
 
-	s.logger.Printf("[DEBUG] agent: Event '%s' script output: %s, err: %v",
+	s.logger.Printf("[DEBUG] serf: Event '%s' script output: %s, err: %v",
 		event.String(), output.String(), err)
 
 	if err != nil {
