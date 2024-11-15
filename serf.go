@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -172,10 +174,11 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.ping.id = m.ID()
 
 	addr, err := s.AdvertiseAddress()
-	if err == nil {
+	if err != nil {
 		return nil, err
 	}
 	s.usrState.addr = addr
+	s.config.DNSConfigPath = b.mconf.DNSConfigPath
 
 	s.schedule()
 	go s.receiveNodeEvents()
@@ -187,8 +190,30 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	return s, nil
 }
 
+func resolveAddrs(addrs []string, dnsPath string) ([]string, []error) {
+	var res []string
+	var errs []error
+	for _, addr := range addrs {
+		ips, port, err := memberlist.ResolveAddr(addr, dnsPath)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		for _, ip := range ips {
+			res = append(res, net.JoinHostPort(ip.String(), strconv.Itoa(int(port))))
+		}
+	}
+	return res, errs
+}
+
 func (s *Serf) Join(existing []string, ignoreOld bool) (int, error) {
-	for _, addr := range existing {
+	res, errs := resolveAddrs(existing, s.config.DNSConfigPath)
+	if len(errs) != 0 {
+		for _, err := range errs {
+			s.logger.Printf("[ERR] serf: error resolving address %v", err)
+		}
+	}
+	for _, addr := range res {
 		s.usrState.setJoin(addr)
 		s.usrState.setIgnoreActOnJoin(addr, ignoreOld)
 	}

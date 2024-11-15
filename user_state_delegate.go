@@ -37,12 +37,14 @@ func newUserStateDelegate(
 	mergeLeftNodes func(...*memberlist.Node),
 ) *userStateDelegate {
 	return &userStateDelegate{
-		queryClock:     queryClock,
-		action:         action,
-		logger:         logger,
-		handleAction:   handleAct,
-		getLeftNodes:   getLeftNodes,
-		mergeLeftNodes: mergeLeftNodes,
+		queryClock:      queryClock,
+		action:          action,
+		logger:          logger,
+		joining:         make(map[string]bool),
+		ignoreActOnJoin: make(map[string]bool),
+		handleAction:    handleAct,
+		getLeftNodes:    getLeftNodes,
+		mergeLeftNodes:  mergeLeftNodes,
 	}
 }
 

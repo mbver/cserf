@@ -19,4 +19,5 @@ type Config struct {
 	TombstoneTimeout         time.Duration // to remove left nodes
 	MaxQueueDepth            int
 	ManageQueueDepthInterval time.Duration
+	DNSConfigPath            string
 } // TODO: broadcast timeout should inject to memberlist config
