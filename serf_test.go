@@ -397,6 +397,44 @@ func TestSerf_Reconnect_SameIP(t *testing.T) {
 	require.True(t, match, msg)
 }
 
+func TestSerf_SetTags(t *testing.T) {
+	s1, s2, eventCh, cleanup, err := twoNodesJoinedWithEventStream()
+	defer cleanup()
+	require.Nil(t, err)
+	s1.SetTags(map[string]string{"port": "8000"})
+	changed, msg := retry(5, func() (bool, string) {
+		time.Sleep(10 * time.Millisecond)
+		n1 := s2.mlist.GetNodeState(s1.ID())
+		tags, err := decodeTags(n1.Node.Tags)
+		require.Nil(t, err)
+		if tags["port"] != "8000" {
+			return false, "wrong tags: " + tags["port"]
+		}
+		return true, ""
+	})
+	require.True(t, changed, msg)
+	match, msg := checkEventsForNode(s1.ID(), eventCh, []EventType{
+		EventMemberUpdate,
+	})
+	require.True(t, match, msg)
+	s2.SetTags(map[string]string{"datacenter": "east-aws"})
+	changed, msg = retry(5, func() (bool, string) {
+		time.Sleep(10 * time.Millisecond)
+		n2 := s1.mlist.GetNodeState(s2.ID())
+		tags, err := decodeTags(n2.Node.Tags)
+		require.Nil(t, err)
+		if tags["datacenter"] != "east-aws" {
+			return false, "wrong tags: " + tags["port"]
+		}
+		return true, ""
+	})
+	require.True(t, changed, msg)
+	match, msg = checkEventsForNode(s2.ID(), eventCh, []EventType{
+		EventMemberUpdate,
+	})
+	require.True(t, match, msg)
+}
+
 func retry(times int, fn func() (bool, string)) (success bool, msg string) {
 	for i := 0; i < times; i++ {
 		success, msg = fn()
