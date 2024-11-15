@@ -172,34 +172,40 @@ func TestSerf_Create(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func twoNodesJoinedWithEventStream() (*Serf, *Serf, chan Event, func(), error) {
-	stream := StreamEventHandler{
-		eventCh: make(chan Event, 10),
-	}
+func twoNodesJoined() (*Serf, *Serf, func(), error) {
+	return twoNodesJoinedWithEventStream(nil)
+}
+
+func twoNodesJoinedWithEventStream(eventCh chan Event) (*Serf, *Serf, func(), error) {
 	s1, s2, cleanup, err := twoNodes()
 	if err != nil {
-		return nil, nil, nil, cleanup, err
+		return nil, nil, cleanup, err
 	}
-	s1.eventHandlers.stream.register(&stream)
+	if eventCh != nil {
+		stream := StreamEventHandler{
+			eventCh: eventCh,
+		}
+		s1.eventHandlers.stream.register(&stream)
+	}
 	addr, err := s2.AdvertiseAddress()
 	if err != nil {
-		return nil, nil, nil, cleanup, err
+		return nil, nil, cleanup, err
 	}
 	n, err := s1.Join([]string{addr}, false)
 	if err != nil {
-		return nil, nil, nil, cleanup, err
+		return nil, nil, cleanup, err
 	}
 	if n != 1 {
-		return nil, nil, nil, cleanup, fmt.Errorf("num success %d, expect %d", n, 1)
+		return nil, nil, cleanup, fmt.Errorf("num success %d, expect %d", n, 1)
 	}
 	if s1.mlist.NumActive() != 2 {
-		return nil, nil, nil, cleanup, fmt.Errorf("not enough active nodes")
+		return nil, nil, cleanup, fmt.Errorf("not enough active nodes")
 	}
-	return s1, s2, stream.eventCh, cleanup, nil
+	return s1, s2, cleanup, nil
 }
 
 func TestSerf_Join(t *testing.T) {
-	_, _, _, cleanup, err := twoNodesJoinedWithEventStream()
+	_, _, cleanup, err := twoNodesJoined()
 	defer cleanup()
 	require.Nil(t, err)
 }
@@ -232,7 +238,8 @@ func checkEventsForNode(id string, ch chan Event, expected []EventType) (bool, s
 }
 
 func TestSerf_EventFailedNode(t *testing.T) {
-	_, s2, eventCh, cleanup, err := twoNodesJoinedWithEventStream()
+	eventCh := make(chan Event, 10)
+	_, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
 	defer cleanup()
 	require.Nil(t, err)
 
@@ -253,7 +260,8 @@ func TestSerf_EventFailedNode(t *testing.T) {
 }
 
 func TestSerf_EventJoin(t *testing.T) {
-	_, s2, eventCh, cleanup, err := twoNodesJoinedWithEventStream()
+	eventCh := make(chan Event, 10)
+	_, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
 	defer cleanup()
 	require.Nil(t, err)
 
@@ -273,7 +281,8 @@ func TestSerf_EventJoin(t *testing.T) {
 }
 
 func TestSerf_EventLeave(t *testing.T) {
-	_, s2, eventCh, cleanup, err := twoNodesJoinedWithEventStream()
+	eventCh := make(chan Event, 10)
+	_, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
 	defer cleanup()
 	require.Nil(t, err)
 
@@ -293,7 +302,8 @@ func TestSerf_EventLeave(t *testing.T) {
 }
 
 func TestSerf_Reconnect(t *testing.T) {
-	s1, s2, eventCh, cleanup, err := twoNodesJoinedWithEventStream()
+	eventCh := make(chan Event, 10)
+	s1, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
 	defer cleanup()
 	require.Nil(t, err)
 
@@ -398,7 +408,8 @@ func TestSerf_Reconnect_SameIP(t *testing.T) {
 }
 
 func TestSerf_SetTags(t *testing.T) {
-	s1, s2, eventCh, cleanup, err := twoNodesJoinedWithEventStream()
+	eventCh := make(chan Event, 10)
+	s1, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
 	defer cleanup()
 	require.Nil(t, err)
 	s1.SetTags(map[string]string{"port": "8000"})
@@ -443,4 +454,93 @@ func retry(times int, fn func() (bool, string)) (success bool, msg string) {
 		}
 	}
 	return
+}
+
+func TestSerf_JoinLeave(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoined()
+	defer cleanup()
+	require.Nil(t, err)
+
+	err = s1.Leave()
+	require.Nil(t, err)
+
+	time.Sleep(2*s2.config.ReapInterval + s2.config.TombstoneTimeout)
+
+	s2.inactive.l.Lock()
+	nLeft := len(s2.inactive.left)
+	s2.inactive.l.Unlock()
+	require.Zero(t, nLeft)
+
+	require.Equal(t, 1, s2.mlist.NumActive())
+}
+
+func TestSerf_LeaveJoinDifferentRole(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoined()
+	defer cleanup()
+	require.Nil(t, err)
+
+	err = s2.Leave()
+	require.Nil(t, err)
+
+	s2.Shutdown()
+	ip, _, err := s2.mlist.GetAdvertiseAddr()
+	require.Nil(t, err)
+
+	tags := map[string]string{"role": "bar"}
+	s3, cleanup1, err := testNodeWithIP(tags, ip)
+	defer cleanup1()
+	require.Nil(t, err)
+
+	addr, err := s1.AdvertiseAddress()
+	require.Nil(t, err)
+	s3.Join([]string{addr}, false)
+
+	found, msg := retry(5, func() (bool, string) {
+		time.Sleep(10 * time.Millisecond)
+		node := s1.mlist.GetNodeState(s3.ID())
+		if node == nil {
+			return false, "node not exist"
+		}
+		tags, err := decodeTags(node.Node.Tags)
+		require.Nil(t, err)
+		if tags["role"] != "bar" {
+			return false, "wrong role"
+		}
+		return true, ""
+	})
+	require.True(t, found, msg)
+}
+
+func TestSerf_Role(t *testing.T) {
+	s1, cleanup1, err := testNode(map[string]string{"role": "web"})
+	defer cleanup1()
+	require.Nil(t, err)
+
+	s2, cleanup2, err := testNode(map[string]string{"role": "lb"})
+	defer cleanup2()
+	require.Nil(t, err)
+
+	addr, err := s2.AdvertiseAddress()
+	require.Nil(t, err)
+
+	n, err := s1.Join([]string{addr}, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, n)
+
+	found, msg := retry(5, func() (bool, string) {
+		n1 := s2.mlist.GetNodeState(s1.ID())
+		tags, err := decodeTags(n1.Node.Tags)
+		require.Nil(t, err)
+		if tags["role"] != "web" {
+			return false, "role for node 1 wrong: " + tags["role"]
+		}
+		n2 := s1.mlist.GetNodeState(s2.ID())
+		tags, err = decodeTags(n2.Node.Tags)
+		require.Nil(t, err)
+		if tags["role"] != "lb" {
+			return false, "role for node 2 wrong: " + tags["role"]
+		}
+		return true, ""
+	})
+	require.True(t, found, msg)
 }

@@ -93,7 +93,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 		return nil, err
 	}
 	s.snapshot = snap
-
+	prev := s.snapshot.AliveNodes()
 	outCh = NewMemberEventCoalescer(s.config.CoalesceInterval,
 		outCh,
 		s.logger,
@@ -155,7 +155,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 
 	s.tags = make(map[string]string)
 	if len(b.tags) != 0 {
-		encoded, err := encodeTags(s.tags)
+		encoded, err := encodeTags(b.tags)
 		if len(encoded) > memberlist.TagMaxSize {
 			return nil, memberlist.ErrMaxTagSizeExceed
 		}
@@ -186,7 +186,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	go s.receiveEvents()
 	go s.receiveInvokeScripts()
 	go s.receiveMsgs()
-	go s.rejoinSnapshot()
+	go s.rejoinSnapshot(prev)
 	return s, nil
 }
 
@@ -227,8 +227,7 @@ func (s *Serf) Join(existing []string, ignoreOld bool) (int, error) {
 }
 
 // try to join 1 previously known-node
-func (s *Serf) rejoinSnapshot() {
-	prev := s.snapshot.AliveNodes()
+func (s *Serf) rejoinSnapshot(prev []*NodeIDAddr) {
 	if len(prev) == 0 {
 		return
 	}
