@@ -275,7 +275,9 @@ func (s *Serf) invokeEventScript(script string, event Event) error {
 
 	// If this is a query and we have output, respond
 	if q, ok := event.(*QueryEvent); ok && output.TotalWritten() > 0 {
-		s.respondToQueryEvent(q, output.Bytes())
+		if err := s.respondToQueryEvent(q, output.Bytes()); err != nil {
+			s.logger.Printf("[ERR] serf: failed to respond to query")
+		}
 	}
 	return nil
 }

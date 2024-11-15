@@ -8,6 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The chance of failing this test is that a node is not receiving broadcast msg from two nodes.
+// Each node broadcast msg 4 times ==> (0.5)^(2*4) = 0.39%
+// That is 1 in each 250 runs!
 func TestSerf_Query(t *testing.T) {
 	s1, s2, s3, cleanup, err := threeNodes()
 	defer cleanup()

@@ -1,6 +1,8 @@
 package serf
 
-import memberlist "github.com/mbver/mlist"
+import (
+	memberlist "github.com/mbver/mlist"
+)
 
 type broadcastManager struct {
 	maxQueueDepth    int
@@ -27,7 +29,7 @@ func (m *broadcastManager) GetBroadcasts(overhead, limit int) [][]byte {
 		bytesUsed += (len(msg) + overhead)
 	}
 
-	actionMsgs := m.queryBroadcasts.GetMessages(overhead, limit-bytesUsed)
+	actionMsgs := m.actionBroadcasts.GetMessages(overhead, limit-bytesUsed)
 	var msgs [][]byte
 	msgs = append(msgs, queryMsgs...)
 	msgs = append(msgs, actionMsgs...)
