@@ -59,7 +59,7 @@ func combineCleanup(cleanups ...func()) func() {
 }
 
 func testNode(tag map[string]string) (*Serf, func(), error) {
-	return testNodeWithIP(nil, nil)
+	return testNodeWithIP(tag, nil)
 }
 
 func testNodeWithIP(tags map[string]string, ip net.IP) (*Serf, func(), error) {
