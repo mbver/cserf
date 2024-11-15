@@ -35,7 +35,8 @@ func NewMemberEventCoalescer(interval time.Duration, inCh chan Event, logger *lo
 
 func isMemberEvent(t EventType) bool {
 	return t == EventMemberJoin || t == EventMemberLeave ||
-		t == EventMemberUpdate || t == EventMemberReap
+		t == EventMemberFailed || t == EventMemberUpdate ||
+		t == EventMemberReap
 }
 
 func (c *MemberEventCoalescer) flush() {

@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -39,7 +40,9 @@ func createTestEventScript() (string, func(), error) {
 
 func testMemberlistConfig() *memberlist.Config {
 	conf := memberlist.DefaultLANConfig()
-	conf.ProbeInterval = 0
+	conf.PingTimeout = 20 * time.Millisecond
+	conf.ProbeInterval = 60 * time.Millisecond
+	conf.ProbeInterval = 5 * time.Millisecond
 	conf.GossipInterval = 5 * time.Millisecond
 	conf.PushPullInterval = 0
 	conf.ReapInterval = 0
@@ -85,7 +88,9 @@ func testNode(tags map[string]string) (*Serf, func(), error) {
 		SnapshotMinCompactSize: 128 * 1024,
 		SnapshotDrainTimeout:   10 * time.Millisecond,
 		CoalesceInterval:       5 * time.Millisecond,
+		ReapInterval:           5 * time.Millisecond,
 		MaxQueueDepth:          1024,
+		ReconnectTimeout:       5 * time.Millisecond,
 	} // fill in later
 
 	cleanup1 := combineCleanup(cleanup, func() {
@@ -162,7 +167,66 @@ func TestSerf_Join(t *testing.T) {
 	n, err := s1.Join([]string{addr}, false)
 	require.Nil(t, err)
 	require.Equal(t, 1, n)
-	time.Sleep(10 * time.Millisecond)
+	require.Equal(t, 2, s1.mlist.NumActive())
+}
+
+func checkEventsForNode(id string, ch chan Event, chLen int, expected []EventType) (bool, string) {
+	if len(ch) < chLen {
+		return false, "not enough event in ch"
+	}
+	received := make([]EventType, 0, len(expected))
+	n := len(ch)
+	for i := 0; i < n; i++ {
+		e := <-ch
+		mEvent, ok := e.(*CoalescedMemberEvent)
+		if !ok {
+			received = append(received, e.EventType())
+			continue
+		}
+		found := false
+		for _, m := range mEvent.Members {
+			if m.ID == id {
+				found = true
+				break
+			}
+		}
+		if found {
+			received = append(received, mEvent.EventType())
+		}
+	}
+	if reflect.DeepEqual(expected, received) {
+		return true, ""
+	}
+	return false, fmt.Sprintf("event not match: expect: %v, got %v", expected, received)
+}
+
+func TestSerf_EventFailedNode(t *testing.T) {
+	s1, s2, cleanup, err := twoNodes()
+
+	stream := &StreamEventHandler{
+		eventCh: make(chan Event, 4),
+	}
+	s1.eventHandlers.stream.register(stream)
+
+	defer cleanup()
+	require.Nil(t, err)
+
+	addr, err := s2.AdvertiseAddress()
+	require.Nil(t, err)
+
+	n, err := s1.Join([]string{addr}, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, n)
+	require.Equal(t, 2, s1.mlist.NumActive())
+
+	s2.Shutdown()
+	success, msg := retry(5, func() (bool, string) {
+		time.Sleep(50 * time.Millisecond)
+		return checkEventsForNode(s2.ID(), stream.eventCh, 3, []EventType{
+			EventMemberJoin, EventMemberFailed, EventMemberReap,
+		})
+	})
+	require.True(t, success, msg)
 }
 
 func retry(times int, fn func() (bool, string)) (success bool, msg string) {

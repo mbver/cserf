@@ -104,9 +104,12 @@ func (m *streamEventHandlerManager) deregister(h *StreamEventHandler) {
 }
 
 type StreamEventHandler struct {
+	eventCh chan Event
 }
 
-func (h *StreamEventHandler) HandleEvent(e Event) {}
+func (h *StreamEventHandler) HandleEvent(e Event) {
+	h.eventCh <- e
+}
 
 type scriptEventHandlerManager struct {
 	l           sync.Mutex
