@@ -63,6 +63,10 @@ func testNode(tag map[string]string) (*Serf, func(), error) {
 }
 
 func testNodeWithIP(tags map[string]string, ip net.IP) (*Serf, func(), error) {
+	return testNodeWithIpPort(tags, ip, 0)
+}
+
+func testNodeWithIpPort(tags map[string]string, ip net.IP, port int) (*Serf, func(), error) {
 	b := &SerfBuilder{}
 	cleanup := func() {}
 
@@ -78,6 +82,9 @@ func testNodeWithIP(tags map[string]string, ip net.IP) (*Serf, func(), error) {
 	}
 	mconf := testMemberlistConfig()
 	mconf.BindAddr = ip.String()
+	if port != 0 {
+		mconf.BindPort = port
+	}
 	mconf.Label = "label"
 	b.WithMemberlistConfig(mconf)
 
@@ -285,7 +292,7 @@ func TestSerf_EventLeave(t *testing.T) {
 	require.True(t, success, msg)
 }
 
-func Test_SerfReconnect(t *testing.T) {
+func TestSerf_Reconnect(t *testing.T) {
 	s1, s2, eventCh, cleanup, err := twoNodesJoinedWithEventStream()
 	defer cleanup()
 	require.Nil(t, err)
@@ -323,6 +330,68 @@ func Test_SerfReconnect(t *testing.T) {
 	})
 	require.True(t, enough, msg)
 	match, msg = checkEventsForNode(s2.ID(), eventCh, []EventType{
+		EventMemberJoin,
+	})
+	require.True(t, match, msg)
+}
+
+func TestSerf_Reconnect_SameIP(t *testing.T) {
+	s1, cleanup1, err := testNode(nil)
+	defer cleanup1()
+	require.Nil(t, err)
+	stream := &StreamEventHandler{
+		eventCh: make(chan Event, 10),
+	}
+	s1.eventHandlers.stream.register(stream)
+
+	s1.inactive.l.Lock()
+	s1.inactive.failedTimeout = 5 * time.Second
+	s1.inactive.l.Unlock()
+	go scheduleFunc(5*time.Millisecond, s1.shutdownCh, s1.reconnect)
+
+	ip, port, err := s1.mlist.GetAdvertiseAddr()
+	require.Nil(t, err)
+
+	s2, cleanup2, err := testNodeWithIpPort(nil, ip, int(port+1))
+	defer cleanup2()
+	require.Nil(t, err)
+
+	addr, err := s2.AdvertiseAddress()
+	require.Nil(t, err)
+
+	n, err := s1.Join([]string{addr}, false)
+	require.Equal(t, 1, n)
+	require.Nil(t, err)
+	require.Equal(t, 2, s1.mlist.NumActive())
+
+	s2.Shutdown()
+
+	enough, msg := retry(5, func() (bool, string) {
+		time.Sleep(50 * time.Millisecond)
+		if len(stream.eventCh) < 2 {
+			return false, "not enough events"
+		}
+		return true, ""
+	})
+	require.True(t, enough, msg)
+	match, msg := checkEventsForNode(s2.ID(), stream.eventCh, []EventType{
+		EventMemberJoin, EventMemberFailed,
+	})
+	require.True(t, match, msg)
+
+	s2, cleanup2, err = testNodeWithIpPort(nil, ip, int(port+1))
+	defer cleanup2()
+	require.Nil(t, err)
+
+	enough, msg = retry(5, func() (bool, string) {
+		time.Sleep(10 * time.Millisecond)
+		if len(stream.eventCh) < 1 {
+			return false, "not enough events"
+		}
+		return true, ""
+	})
+	require.True(t, enough, msg)
+	match, msg = checkEventsForNode(s2.ID(), stream.eventCh, []EventType{
 		EventMemberJoin,
 	})
 	require.True(t, match, msg)
