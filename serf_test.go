@@ -156,18 +156,36 @@ func TestSerf_Create(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestSerf_Join(t *testing.T) {
+func twoNodesJoinedWithEventStream() (*Serf, *Serf, chan Event, func(), error) {
+	stream := StreamEventHandler{
+		eventCh: make(chan Event, 10),
+	}
 	s1, s2, cleanup, err := twoNodes()
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+	s1.eventHandlers.stream.register(&stream)
+	addr, err := s2.AdvertiseAddress()
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+	n, err := s1.Join([]string{addr}, false)
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+	if n != 1 {
+		return nil, nil, nil, cleanup, fmt.Errorf("num success %d, expect %d", n, 1)
+	}
+	if s1.mlist.NumActive() != 2 {
+		return nil, nil, nil, cleanup, fmt.Errorf("not enough active nodes")
+	}
+	return s1, s2, stream.eventCh, cleanup, nil
+}
+
+func TestSerf_Join(t *testing.T) {
+	_, _, _, cleanup, err := twoNodesJoinedWithEventStream()
 	defer cleanup()
 	require.Nil(t, err)
-
-	addr, err := s2.AdvertiseAddress()
-	require.Nil(t, err)
-
-	n, err := s1.Join([]string{addr}, false)
-	require.Nil(t, err)
-	require.Equal(t, 1, n)
-	require.Equal(t, 2, s1.mlist.NumActive())
 }
 
 func checkEventsForNode(id string, ch chan Event, chLen int, expected []EventType) (bool, string) {
@@ -201,29 +219,45 @@ func checkEventsForNode(id string, ch chan Event, chLen int, expected []EventTyp
 }
 
 func TestSerf_EventFailedNode(t *testing.T) {
-	s1, s2, cleanup, err := twoNodes()
-
-	stream := &StreamEventHandler{
-		eventCh: make(chan Event, 4),
-	}
-	s1.eventHandlers.stream.register(stream)
-
+	_, s2, eventCh, cleanup, err := twoNodesJoinedWithEventStream()
 	defer cleanup()
 	require.Nil(t, err)
-
-	addr, err := s2.AdvertiseAddress()
-	require.Nil(t, err)
-
-	n, err := s1.Join([]string{addr}, false)
-	require.Nil(t, err)
-	require.Equal(t, 1, n)
-	require.Equal(t, 2, s1.mlist.NumActive())
 
 	s2.Shutdown()
 	success, msg := retry(5, func() (bool, string) {
 		time.Sleep(50 * time.Millisecond)
-		return checkEventsForNode(s2.ID(), stream.eventCh, 3, []EventType{
+		return checkEventsForNode(s2.ID(), eventCh, 3, []EventType{
 			EventMemberJoin, EventMemberFailed, EventMemberReap,
+		})
+	})
+	require.True(t, success, msg)
+}
+
+func TestSerf_EventJoin(t *testing.T) {
+	_, s2, eventCh, cleanup, err := twoNodesJoinedWithEventStream()
+	defer cleanup()
+	require.Nil(t, err)
+
+	s2.Shutdown()
+	success, msg := retry(5, func() (bool, string) {
+		time.Sleep(50 * time.Millisecond)
+		return checkEventsForNode(s2.ID(), eventCh, 1, []EventType{
+			EventMemberJoin,
+		})
+	})
+	require.True(t, success, msg)
+}
+
+func TestSerf_EventLeave(t *testing.T) {
+	_, s2, eventCh, cleanup, err := twoNodesJoinedWithEventStream()
+	defer cleanup()
+	require.Nil(t, err)
+
+	s2.Leave()
+	success, msg := retry(5, func() (bool, string) {
+		time.Sleep(50 * time.Millisecond)
+		return checkEventsForNode(s2.ID(), eventCh, 2, []EventType{
+			EventMemberJoin, EventMemberLeave,
 		})
 	})
 	require.True(t, success, msg)
