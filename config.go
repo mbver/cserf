@@ -8,6 +8,8 @@ type Config struct {
 	RelayFactor              int
 	QueryTimeoutMult         int
 	QueryResponseSizeLimit   int
+	QuerySizeLimit           int // TODO: check it in query
+	ActionSizeLimit          int
 	SnapshotPath             string
 	SnapshotMinCompactSize   int
 	SnapshotDrainTimeout     time.Duration

@@ -13,6 +13,7 @@ import (
 )
 
 const tagMagicByte msgType = 255
+const MaxActionSizeLimit = 9 * 1024
 
 type SerfStateType int
 
@@ -21,6 +22,18 @@ const (
 	SerfLeft
 	SerfShutdown
 )
+
+func (t SerfStateType) String() string {
+	switch t {
+	case SerfAlive:
+		return "alive"
+	case SerfLeft:
+		return "left"
+	case SerfShutdown:
+		return "shutdown"
+	}
+	return "unknown-state"
+}
 
 type Serf struct {
 	config         *Config
@@ -76,6 +89,9 @@ func (b *SerfBuilder) WithTags(tags map[string]string) {
 }
 
 func (b *SerfBuilder) Build() (*Serf, error) {
+	if b.conf.ActionSizeLimit > MaxActionSizeLimit {
+		return nil, fmt.Errorf("action size limit exceeds %d", b.conf.ActionSizeLimit)
+	}
 	s := &Serf{}
 	s.config = b.conf
 	s.logger = b.logger

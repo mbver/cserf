@@ -1,6 +1,7 @@
 package serf
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 )
@@ -72,9 +73,13 @@ func (m *ActionManager) getActionMinTime() LamportTime {
 	return m.actionMinTime
 }
 
+var ErrActionSizeLimitExceed = fmt.Errorf("action size limit exceeded")
+
 // trigger a cluster action on all nodes
 func (s *Serf) Action(name string, payload []byte) error {
-	// check size??
+	if len(payload) > s.config.ActionSizeLimit {
+		return ErrActionSizeLimitExceed
+	}
 	lTime := s.action.clock.Time()
 	s.action.clock.Next()
 	msg := &msgAction{
@@ -84,6 +89,9 @@ func (s *Serf) Action(name string, payload []byte) error {
 		Payload: payload,
 	}
 	encoded, err := encode(msgActionType, msg)
+	if len(encoded) > s.config.ActionSizeLimit {
+		return ErrActionSizeLimitExceed
+	}
 	if err != nil {
 		return err
 	}

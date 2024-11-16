@@ -98,6 +98,8 @@ func testNodeWithIpPort(tags map[string]string, ip net.IP, port int) (*Serf, fun
 		LBufferSize:            1024,
 		QueryTimeoutMult:       16,
 		QueryResponseSizeLimit: 1024,
+		QuerySizeLimit:         1024,
+		ActionSizeLimit:        512,
 		SnapshotPath:           filepath.Join(os.TempDir(), snapfile),
 		SnapshotMinCompactSize: 128 * 1024,
 		SnapshotDrainTimeout:   10 * time.Millisecond,
@@ -181,6 +183,7 @@ func twoNodesJoinedWithEventStream(eventCh chan Event) (*Serf, *Serf, func(), er
 	if err != nil {
 		return nil, nil, cleanup, err
 	}
+	time.Sleep(10 * time.Millisecond) // wait until initial join events flushed out of the pipeline
 	if eventCh != nil {
 		stream := StreamEventHandler{
 			eventCh: eventCh,
@@ -273,13 +276,12 @@ func TestSerf_EventJoinShutdown(t *testing.T) {
 
 	success, msg := retry(5, func() (bool, string) {
 		time.Sleep(50 * time.Millisecond)
-		if len(eventCh) < 3 { // if eventCh can record s1's join, it will be 4 events!
+		if len(eventCh) != 3 { // if eventCh can record s1's join, it will be 4 events!
 			return false, "not enough events"
 		}
 		return true, ""
 	})
 	require.True(t, success, msg)
-	time.Sleep(s2.config.ReapInterval + s2.config.ReconnectTimeout + time.Millisecond)
 	success, msg = checkEventsForNode(s2.ID(), eventCh, []EventType{
 		EventMemberJoin, EventMemberFailed, EventMemberReap,
 	})
@@ -599,6 +601,45 @@ func TestSerf_Role(t *testing.T) {
 	require.True(t, found, msg)
 }
 
+func TestSerf_JoinIgnoreOld(t *testing.T) {
+	s1, s2, cleanup, err := twoNodes()
+	defer cleanup()
+	require.Nil(t, err)
+
+	time.Sleep(10 * time.Millisecond) // wait for flushing initial join-event
+	eventCh := make(chan Event, 10)
+	stream := StreamEventHandler{
+		eventCh: eventCh,
+	}
+	s1.eventHandlers.stream.register(&stream)
+
+	err = s2.Action("first", []byte("first-test"))
+	require.Nil(t, err)
+
+	err = s2.Action("second", []byte("second-test"))
+	require.Nil(t, err)
+
+	time.Sleep(10 * time.Millisecond)
+
+	addr, err := s2.AdvertiseAddress()
+	require.Nil(t, err)
+
+	n, err := s1.Join([]string{addr}, true)
+	require.Equal(t, 1, n)
+	require.Nil(t, err)
+
+	enough, msg := retry(5, func() (bool, string) {
+		time.Sleep(10 * time.Millisecond)
+		if len(eventCh) < 1 {
+			return false, "not enough events"
+		}
+		return true, ""
+	})
+	require.True(t, enough, msg)
+	match, msg := checkActions(eventCh, []string{}, [][]byte{})
+	require.True(t, match, msg)
+}
+
 func TestSerf_State(t *testing.T) {
 	s, cleanup, err := testNode(nil)
 	defer cleanup()
@@ -611,6 +652,14 @@ func TestSerf_State(t *testing.T) {
 
 	s.Shutdown()
 	require.Equal(t, SerfShutdown, s.State())
+}
+
+func TestSerf_StateString(t *testing.T) {
+	states := []SerfStateType{SerfAlive, SerfLeft, SerfShutdown, SerfLeft, SerfShutdown, SerfAlive, SerfStateType(100)}
+	expect := []string{"alive", "left", "shutdown", "left", "shutdown", "alive", "unknown-state"}
+	for i, state := range states {
+		require.Equal(t, expect[i], state.String())
+	}
 }
 
 func TestSerf_ReapHandlerShutdown(t *testing.T) {
