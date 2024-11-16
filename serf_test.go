@@ -446,16 +446,6 @@ func TestSerf_SetTags(t *testing.T) {
 	require.True(t, match, msg)
 }
 
-func retry(times int, fn func() (bool, string)) (success bool, msg string) {
-	for i := 0; i < times; i++ {
-		success, msg = fn()
-		if success {
-			return
-		}
-	}
-	return
-}
-
 func TestSerf_JoinLeave(t *testing.T) {
 	s1, s2, cleanup, err := twoNodesJoined()
 	defer cleanup()
@@ -557,4 +547,33 @@ func TestSerf_State(t *testing.T) {
 
 	s.Shutdown()
 	require.Equal(t, SerfShutdown, s.State())
+}
+
+func TestSerf_ReapHandlerShutdown(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+
+	errCh := make(chan error, 1)
+	go func() {
+		s.Shutdown()
+		time.Sleep(time.Millisecond)
+		errCh <- fmt.Errorf("timeout")
+	}()
+	go func() {
+		scheduleFunc(5*time.Millisecond, s.shutdownCh, s.reap)
+		errCh <- nil
+	}()
+	err = <-errCh
+	require.Nil(t, err)
+}
+
+func retry(times int, fn func() (bool, string)) (success bool, msg string) {
+	for i := 0; i < times; i++ {
+		success, msg = fn()
+		if success {
+			return
+		}
+	}
+	return
 }
