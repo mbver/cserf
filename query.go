@@ -128,6 +128,9 @@ func (m *QueryManager) addToBuffer(msg *msgQuery) (success bool) {
 	return m.buffers.addItem(m.clock.Time(), item)
 }
 
+var ErrQuerySizeLimitExceed = fmt.Errorf("query size limit exceeds")
+
+// TODO: add ack?
 func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) error {
 	if params == nil {
 		params = s.DefaultQueryParams()
@@ -135,7 +138,9 @@ func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) error {
 	if params.Timeout == 0 {
 		params.Timeout = s.DefaultQueryTimeout()
 	}
-
+	if len(params.Payload) > s.config.QuerySizeLimit {
+		return ErrQuerySizeLimitExceed
+	}
 	addr, port, err := s.mlist.GetAdvertiseAddr()
 	if err != nil {
 		return err
@@ -160,6 +165,9 @@ func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) error {
 	msg, err := encode(msgQueryType, q)
 	if err != nil {
 		return err
+	}
+	if len(msg) > s.config.QuerySizeLimit {
+		return ErrQuerySizeLimitExceed
 	}
 	s.handleQuery(msg)
 	return nil

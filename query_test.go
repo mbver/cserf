@@ -1,6 +1,7 @@
 package serf
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -8,23 +9,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func threeNodesJoined() (*Serf, *Serf, *Serf, func(), error) {
+	s1, s2, s3, cleanup, err := threeNodes()
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+	addr2, err := s2.AdvertiseAddress()
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+	addr3, err := s3.AdvertiseAddress()
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+
+	n, err := s1.Join([]string{addr2, addr3}, false)
+	if n != 2 {
+		return nil, nil, nil, cleanup, fmt.Errorf("missing in join")
+	}
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+	return s1, s2, s3, cleanup, nil
+}
+
 // The chance of failing this test is that a node is not receiving broadcast msg from two nodes.
 // Each node broadcast msg 4 times ==> (0.5)^(2*4) = 0.39%
 // That is 1 in each 250 runs!
 func TestSerf_Query(t *testing.T) {
-	s1, s2, s3, cleanup, err := threeNodes()
+	s1, s2, s3, cleanup, err := threeNodesJoined()
 	defer cleanup()
 	require.Nil(t, err)
 
-	addr2, err := s2.AdvertiseAddress()
-	require.Nil(t, err)
-
-	addr3, err := s3.AdvertiseAddress()
-	require.Nil(t, err)
-
-	n, err := s1.Join([]string{addr2, addr3}, false)
-	require.Nil(t, err)
-	require.Equal(t, 2, n)
 	respCh := make(chan *QueryResponse, 3)
 	s1.Query(respCh, nil)
 
@@ -50,6 +66,59 @@ func TestSerf_Query(t *testing.T) {
 		return true, ""
 	})
 	require.True(t, success, msg)
+}
+
+func TestSerf_Query_SizeLimit(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+
+	payload := make([]byte, s.config.QuerySizeLimit)
+	params := s.DefaultQueryParams()
+	params.Payload = payload
+	err = s.Query(make(chan *QueryResponse), params)
+	require.NotNil(t, err)
+	require.True(t, errors.Is(err, ErrQuerySizeLimitExceed))
+}
+
+func TestSerf_Query_SizeLimit_Increased(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+
+	payload := make([]byte, s.config.QuerySizeLimit)
+	params := s.DefaultQueryParams()
+	params.Payload = payload
+	s.config.QuerySizeLimit = 2048
+	err = s.Query(make(chan *QueryResponse, 1), params)
+	require.Nil(t, err)
+}
+
+func TestSerf_Query_FilterNodes(t *testing.T) {
+	s1, s2, _, cleanup, err := threeNodesJoined()
+	defer cleanup()
+	require.Nil(t, err)
+
+	params := s2.DefaultQueryParams()
+	params.ForNodes = []string{s1.ID()}
+
+	respCh := make(chan *QueryResponse, 3)
+	s1.Query(respCh, params)
+
+	success, msg := retry(5, func() (bool, string) {
+		time.Sleep(10 * time.Millisecond)
+		if len(respCh) != 1 {
+			return false, fmt.Sprintf("receive %d/1", len(respCh))
+		}
+		return true, ""
+	})
+	require.True(t, success, msg)
+	e := <-respCh
+	require.Equal(t, s1.ID(), e.From)
+}
+
+func TestSerf_Query_Duplicate(t *testing.T) {
+
 }
 
 func TestSerf_IsQueryAccepted(t *testing.T) {
