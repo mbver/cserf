@@ -23,7 +23,7 @@ type ActionManager struct {
 
 func newActionManager(bufferSize int) *ActionManager {
 	return &ActionManager{
-		clock:   &LamportClock{},
+		clock:   &LamportClock{1},
 		buffers: make([]*lGroupItem, bufferSize),
 	}
 }
@@ -80,10 +80,8 @@ func (s *Serf) Action(name string, payload []byte) error {
 	if len(payload) > s.config.ActionSizeLimit {
 		return ErrActionSizeLimitExceed
 	}
-	lTime := s.action.clock.Time()
-	s.action.clock.Next()
 	msg := &msgAction{
-		LTime:   lTime,
+		LTime:   s.action.clock.Time(), // witness will auto-increase it
 		ID:      rand.Uint32(),
 		Name:    name,
 		Payload: payload,

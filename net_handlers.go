@@ -145,7 +145,6 @@ func (s *Serf) handleAction(msg []byte) {
 	if a.LTime < s.action.getActionMinTime() {
 		return
 	}
-
 	if !s.action.addToBuffer(&a) {
 		return
 	}

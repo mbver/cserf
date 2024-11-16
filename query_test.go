@@ -160,7 +160,7 @@ func TestSerf_IsQueryAccepted(t *testing.T) {
 		"role":       "webserver",
 		"datacenter": "east-aws",
 	}
-	s, cleanup, err := testNode(tags)
+	s, cleanup, err := testNode(&testNodeOpts{tags: tags})
 	defer cleanup()
 	require.Nil(t, err)
 

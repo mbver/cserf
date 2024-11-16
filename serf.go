@@ -155,6 +155,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 
 	s.query = newQueryManager(b.logger, b.conf.LBufferSize)
 	s.action = newActionManager(b.conf.LBufferSize)
+	s.action.setActionMinTime(snap.LastActionClock() + 1)
 
 	s.setState(SerfAlive)
 	s.inactive = newInactiveNodes(s.config.ReconnectTimeout, s.config.TombstoneTimeout)
@@ -247,8 +248,15 @@ func (s *Serf) rejoinSnapshot(prev []*NodeIDAddr) {
 	if len(prev) == 0 {
 		return
 	}
+	myAddr, err := s.AdvertiseAddress()
+	if err != nil {
+		s.logger.Printf("[ERR] serf: error reading advertise address")
+	}
 	for _, n := range prev {
 		if n.ID == s.ID() { // it will not happen as new node always has new id!
+			continue
+		}
+		if n.Addr == myAddr { // don't connect to itself!
 			continue
 		}
 		_, err := s.mlist.Join([]string{n.Addr})

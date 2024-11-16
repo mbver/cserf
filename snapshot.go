@@ -24,7 +24,7 @@ const (
 	snapshotCompactionFactor = 2 // compact_threshold = numNodes * bytesPerNode * factor
 )
 
-var snapshotPrefixes = []string{"alive: ", "not alive: ", "clock: ", "action clock: ", "query-clock: ", "coordinate: ", "leave", "#"}
+var snapshotPrefixes = []string{"alive: ", "not alive: ", "clock: ", "action-clock: ", "query-clock: ", "coordinate: ", "leave", "#"}
 
 type Snapshotter struct {
 	aliveNodes      map[string]string
@@ -405,13 +405,6 @@ func (s *Snapshotter) handleLine(l string) {
 		s.aliveNodes[name] = addr // TODO: NOT USEFUL, AND MAY NOT CORRECTLY REFLECT THE NODES WHEN REJOIN. CONSIDER IGNORE!
 	case "not-alive: ":
 		delete(s.aliveNodes, info)
-	case "clock: ":
-		timeInt, err := strconv.ParseUint(info, 10, 64)
-		if err != nil {
-			s.logger.Printf("[WARN] serf: Failed to convert clock time: %v", err)
-			return
-		}
-		s.lastClock = LamportTime(timeInt)
 	case "action-clock: ":
 		timeInt, err := strconv.ParseUint(info, 10, 64)
 		if err != nil {

@@ -18,25 +18,76 @@ import (
 )
 
 var testEventScript string
+var testSnapRecoverScript string
+var testSnapRecoverOutput string
 
-func createTestEventScript() (string, func(), error) {
+func createTestEventScript() (func(), error) {
 	cleanup := func() {}
 	tmp, err := os.CreateTemp("", "*script.sh")
 	if err != nil {
-		return "", cleanup, err
+		return cleanup, err
 	}
 	defer tmp.Close()
 	cleanup = func() {
 		os.Remove(tmp.Name())
 	}
 	if _, err := tmp.Write([]byte(`echo "Hello"`)); err != nil {
-		return "", cleanup, err
+		return cleanup, err
 	}
 	if err := os.Chmod(tmp.Name(), 0755); err != nil {
 		fmt.Println("Error making temp file executable:", err)
-		return "", cleanup, err
+		return cleanup, err
 	}
-	return tmp.Name(), cleanup, nil
+	testEventScript = tmp.Name()
+	return cleanup, nil
+}
+
+func createTestSnapshotRecoverScript() (func(), error) {
+	cleanup := func() {}
+	tmp, err := os.CreateTemp("", "*script.sh")
+	if err != nil {
+		return cleanup, err
+	}
+
+	outfile := strconv.Itoa(rand.Int())
+	testSnapRecoverOutput = filepath.Join(os.TempDir(), outfile)
+	fh, err := os.OpenFile(testSnapRecoverOutput, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		return cleanup, err
+	}
+	defer tmp.Close()
+	cleanup = func() {
+		os.Remove(tmp.Name())
+		os.Remove(testSnapRecoverOutput)
+	}
+	err = fh.Close()
+	if err != nil {
+		return cleanup, err
+	}
+	script := fmt.Sprintf(`echo "$SERF_EVENT" >> %s`, testSnapRecoverOutput)
+	if _, err := tmp.Write([]byte(script)); err != nil {
+		return cleanup, err
+	}
+	if err := os.Chmod(tmp.Name(), 0755); err != nil {
+		fmt.Println("Error making temp file executable:", err)
+		return cleanup, err
+	}
+	testSnapRecoverScript = tmp.Name()
+	return cleanup, nil
+}
+
+func TestMain(m *testing.M) {
+	cleanup1, err := createTestEventScript()
+	defer cleanup1()
+	if err != nil {
+		panic(err)
+	}
+	cleanup2, err := createTestSnapshotRecoverScript()
+	defer cleanup2()
+	if err != nil {
+		panic(err)
+	}
+	m.Run()
 }
 
 func testMemberlistConfig() *memberlist.Config {
@@ -58,15 +109,18 @@ func combineCleanup(cleanups ...func()) func() {
 	}
 }
 
-func testNode(tag map[string]string) (*Serf, func(), error) {
-	return testNodeWithIP(tag, nil)
+type testNodeOpts struct {
+	tags   map[string]string
+	ip     net.IP
+	port   int
+	snap   string
+	script string
 }
 
-func testNodeWithIP(tags map[string]string, ip net.IP) (*Serf, func(), error) {
-	return testNodeWithIpPort(tags, ip, 0)
-}
-
-func testNodeWithIpPort(tags map[string]string, ip net.IP, port int) (*Serf, func(), error) {
+func testNode(opts *testNodeOpts) (*Serf, func(), error) {
+	if opts == nil {
+		opts = &testNodeOpts{}
+	}
 	b := &SerfBuilder{}
 	cleanup := func() {}
 
@@ -77,11 +131,13 @@ func testNodeWithIpPort(tags map[string]string, ip net.IP, port int) (*Serf, fun
 	}
 	b.WithKeyring(keyRing)
 
+	ip := opts.ip
 	if ip == nil {
 		ip, cleanup = testaddr.BindAddrs.NextAvailAddr()
 	}
 	mconf := testMemberlistConfig()
 	mconf.BindAddr = ip.String()
+	port := opts.port
 	if port != 0 {
 		mconf.BindPort = port
 	}
@@ -92,15 +148,23 @@ func testNodeWithIpPort(tags map[string]string, ip net.IP, port int) (*Serf, fun
 	logger := log.New(os.Stderr, prefix, log.LstdFlags)
 	b.WithLogger(logger)
 
-	snapfile := strconv.Itoa(rand.Int())
+	snapPath := opts.snap
+	if snapPath == "" {
+		snapfile := strconv.Itoa(rand.Int())
+		snapPath = filepath.Join(os.TempDir(), snapfile)
+	}
+	script := opts.script
+	if script == "" {
+		script = testEventScript
+	}
 	conf := &Config{
-		EventScript:            testEventScript,
+		EventScript:            script,
 		LBufferSize:            1024,
 		QueryTimeoutMult:       16,
 		QueryResponseSizeLimit: 1024,
 		QuerySizeLimit:         1024,
 		ActionSizeLimit:        512,
-		SnapshotPath:           filepath.Join(os.TempDir(), snapfile),
+		SnapshotPath:           snapPath,
 		SnapshotMinCompactSize: 128 * 1024,
 		SnapshotDrainTimeout:   10 * time.Millisecond,
 		CoalesceInterval:       5 * time.Millisecond,
@@ -119,7 +183,7 @@ func testNodeWithIpPort(tags map[string]string, ip net.IP, port int) (*Serf, fun
 
 	b.WithConfig(conf)
 
-	b.WithTags(tags)
+	b.WithTags(opts.tags)
 
 	s, err := b.Build()
 	if err != nil {
@@ -153,16 +217,6 @@ func threeNodes() (*Serf, *Serf, *Serf, func(), error) {
 		return nil, nil, nil, cleanup, err
 	}
 	return s1, s2, s3, cleanup, err
-}
-
-func TestMain(m *testing.M) {
-	tmp, cleanup, err := createTestEventScript()
-	defer cleanup()
-	if err != nil {
-		panic(err)
-	}
-	testEventScript = tmp
-	m.Run()
 }
 
 func TestSerf_Create(t *testing.T) {
@@ -303,6 +357,13 @@ func TestSerf_EventLeave(t *testing.T) {
 		}
 		return true, ""
 	})
+	if len(eventCh) < 3 {
+		n := len(eventCh)
+		for i := 0; i < n; i++ {
+			e := <-eventCh
+			fmt.Println("============ failed", e.EventType())
+		}
+	}
 	require.True(t, success, msg)
 	success, msg = checkEventsForNode(s2.ID(), eventCh, []EventType{
 		EventMemberJoin, EventMemberLeave, EventMemberReap,
@@ -337,7 +398,7 @@ func TestSerf_Reconnect(t *testing.T) {
 	})
 	require.True(t, match, msg)
 
-	s2, cleanup1, err := testNodeWithIP(nil, ip)
+	s2, cleanup1, err := testNode(&testNodeOpts{ip: ip})
 	defer cleanup1()
 	require.Nil(t, err)
 	enough, msg = retry(5, func() (bool, string) {
@@ -371,7 +432,7 @@ func TestSerf_Reconnect_SameIP(t *testing.T) {
 	ip, port, err := s1.mlist.GetAdvertiseAddr()
 	require.Nil(t, err)
 
-	s2, cleanup2, err := testNodeWithIpPort(nil, ip, int(port+1))
+	s2, cleanup2, err := testNode(&testNodeOpts{ip: ip, port: int(port) + 1})
 	defer cleanup2()
 	require.Nil(t, err)
 
@@ -398,7 +459,7 @@ func TestSerf_Reconnect_SameIP(t *testing.T) {
 	})
 	require.True(t, match, msg)
 
-	s2, cleanup2, err = testNodeWithIpPort(nil, ip, int(port+1))
+	s2, cleanup2, err = testNode(&testNodeOpts{ip: ip, port: int(port) + 1})
 	defer cleanup2()
 	require.Nil(t, err)
 
@@ -503,7 +564,7 @@ func TestSerf_JoinLeaveJoin(t *testing.T) {
 	})
 	require.True(t, s2Left, msg)
 
-	s3, cleanup1, err := testNodeWithIP(nil, ip)
+	s3, cleanup1, err := testNode(&testNodeOpts{ip: ip})
 	defer cleanup1()
 	require.Nil(t, err)
 
@@ -542,7 +603,7 @@ func TestSerf_LeaveJoinDifferentRole(t *testing.T) {
 	require.Nil(t, err)
 
 	tags := map[string]string{"role": "bar"}
-	s3, cleanup1, err := testNodeWithIP(tags, ip)
+	s3, cleanup1, err := testNode(&testNodeOpts{tags: tags, ip: ip})
 	defer cleanup1()
 	require.Nil(t, err)
 
@@ -567,11 +628,15 @@ func TestSerf_LeaveJoinDifferentRole(t *testing.T) {
 }
 
 func TestSerf_Role(t *testing.T) {
-	s1, cleanup1, err := testNode(map[string]string{"role": "web"})
+	s1, cleanup1, err := testNode(&testNodeOpts{
+		tags: map[string]string{"role": "web"},
+	})
 	defer cleanup1()
 	require.Nil(t, err)
 
-	s2, cleanup2, err := testNode(map[string]string{"role": "lb"})
+	s2, cleanup2, err := testNode(&testNodeOpts{
+		tags: map[string]string{"role": "lb"},
+	})
 	defer cleanup2()
 	require.Nil(t, err)
 
