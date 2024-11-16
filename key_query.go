@@ -168,9 +168,6 @@ func (s *Serf) handleKeyQuery(q *QueryEvent) {
 		if err = s.keyring.AddKey(key); err != nil {
 			return
 		}
-		if err = s.writeKeyringFile(); err != nil {
-			return
-		}
 	case useKey:
 		if err = s.keyring.UseKey(key); err != nil {
 			return
@@ -183,7 +180,9 @@ func (s *Serf) handleKeyQuery(q *QueryEvent) {
 		err = fmt.Errorf("unknown key query %s", q.Name)
 		return
 	}
-
+	if err = s.writeKeyringFile(); err != nil {
+		return
+	}
 	resp.Success = true
 
 }

@@ -70,7 +70,7 @@ func testNodeWithIpPort(tags map[string]string, ip net.IP, port int) (*Serf, fun
 	b := &SerfBuilder{}
 	cleanup := func() {}
 
-	key := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	key := []byte{79, 216, 231, 114, 9, 125, 153, 178, 238, 179, 230, 218, 77, 54, 187, 171, 185, 207, 73, 74, 215, 193, 176, 226, 217, 216, 91, 182, 168, 171, 223, 187}
 	keyRing, err := memberlist.NewKeyring(nil, key)
 	if err != nil {
 		return nil, cleanup, err
@@ -210,6 +210,32 @@ func TestSerf_Join(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestSerf_NumNodes(t *testing.T) {
+	s1, cleanup1, err := testNode(nil)
+	defer cleanup1()
+	require.Nil(t, err)
+	require.Equal(t, 1, s1.NumNodes())
+	require.Equal(t, 1, s1.mlist.NumActive())
+
+	s2, cleanup2, err := testNode(nil)
+	defer cleanup2()
+	require.Nil(t, err)
+	require.Equal(t, 1, s2.NumNodes())
+	require.Equal(t, 1, s2.mlist.NumActive())
+
+	addr, err := s2.AdvertiseAddress()
+	require.Nil(t, err)
+	n, err := s1.Join([]string{addr}, false)
+	require.Equal(t, 1, n)
+	require.Nil(t, err)
+
+	require.Equal(t, 2, s1.NumNodes())
+	require.Equal(t, 2, s1.mlist.NumActive())
+	require.Equal(t, 2, s2.NumNodes())
+	require.Equal(t, 2, s2.mlist.NumActive())
+
+}
+
 func checkEventsForNode(id string, ch chan Event, expected []EventType) (bool, string) {
 	received := make([]EventType, 0, len(expected))
 	n := len(ch)
@@ -237,7 +263,7 @@ func checkEventsForNode(id string, ch chan Event, expected []EventType) (bool, s
 	return false, fmt.Sprintf("event not match: expect: %v, got %v", expected, received)
 }
 
-func TestSerf_EventFailedNode(t *testing.T) {
+func TestSerf_EventJoinShutdown(t *testing.T) {
 	eventCh := make(chan Event, 10)
 	_, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
 	defer cleanup()
@@ -247,35 +273,15 @@ func TestSerf_EventFailedNode(t *testing.T) {
 
 	success, msg := retry(5, func() (bool, string) {
 		time.Sleep(50 * time.Millisecond)
-		if len(eventCh) != 3 {
+		if len(eventCh) < 3 { // if eventCh can record s1's join, it will be 4 events!
 			return false, "not enough events"
 		}
 		return true, ""
 	})
 	require.True(t, success, msg)
+	time.Sleep(s2.config.ReapInterval + s2.config.ReconnectTimeout + time.Millisecond)
 	success, msg = checkEventsForNode(s2.ID(), eventCh, []EventType{
 		EventMemberJoin, EventMemberFailed, EventMemberReap,
-	})
-	require.True(t, success, msg)
-}
-
-func TestSerf_EventJoin(t *testing.T) {
-	eventCh := make(chan Event, 10)
-	_, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
-	defer cleanup()
-	require.Nil(t, err)
-
-	s2.Shutdown()
-	success, msg := retry(5, func() (bool, string) {
-		time.Sleep(50 * time.Millisecond)
-		if len(eventCh) != 1 {
-			return false, "not enough events"
-		}
-		return true, ""
-	})
-	require.True(t, success, msg)
-	success, msg = checkEventsForNode(s2.ID(), eventCh, []EventType{
-		EventMemberJoin,
 	})
 	require.True(t, success, msg)
 }
@@ -462,6 +468,64 @@ func TestSerf_JoinLeave(t *testing.T) {
 	require.Zero(t, nLeft)
 
 	require.Equal(t, 1, s2.mlist.NumActive())
+}
+
+func TestSerf_JoinLeaveJoin(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoined()
+	defer cleanup()
+	require.Nil(t, err)
+
+	s1.inactive.l.Lock()
+	s1.inactive.leftTimeout = 0 // never delete
+	s1.inactive.l.Unlock()
+
+	err = s2.Leave()
+	require.Nil(t, err)
+
+	s2.Shutdown()
+	ip, _, err := s2.mlist.GetAdvertiseAddr()
+	require.Nil(t, err)
+
+	s2Left, msg := retry(5, func() (bool, string) {
+		time.Sleep(20 * time.Millisecond)
+		if s1.mlist.NumActive() != 1 {
+			return false, "num of active nodes not reduced"
+		}
+		left := s1.inactive.getLeftNodes()
+		if len(left) != 1 {
+			return false, "not having left node"
+		}
+		if left[0].ID != s2.ID() {
+			return false, "node 2 not leaving: " + s2.ID()
+		}
+		return true, ""
+	})
+	require.True(t, s2Left, msg)
+
+	s3, cleanup1, err := testNodeWithIP(nil, ip)
+	defer cleanup1()
+	require.Nil(t, err)
+
+	addr, err := s1.AdvertiseAddress()
+	require.Nil(t, err)
+	s3.Join([]string{addr}, false)
+
+	joined, msg := retry(5, func() (bool, string) {
+		time.Sleep(10 * time.Millisecond)
+		if s1.mlist.NumActive() != 2 || s3.mlist.NumActive() != 2 {
+			return false, "num of active nodes not correct"
+		}
+		node3 := s1.mlist.GetNodeState(s3.ID())
+		if node3 == nil || node3.Node.ID != s3.ID() {
+			return false, "node 3 not found"
+		}
+		node1 := s3.mlist.GetNodeState(s1.ID())
+		if node1 == nil || node1.Node.ID != s1.ID() {
+			return false, "node 1 not found"
+		}
+		return true, ""
+	})
+	require.True(t, joined, msg)
 }
 
 func TestSerf_LeaveJoinDifferentRole(t *testing.T) {
