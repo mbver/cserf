@@ -92,6 +92,12 @@ func (i *inactiveNodes) addLeftBatch(nodes ...*memberlist.Node) {
 	}
 }
 
+func (i *inactiveNodes) numLeft() int {
+	i.l.Lock()
+	defer i.l.Unlock()
+	return len(i.left)
+}
+
 func (i *inactiveNodes) getLeftNodes() []*memberlist.Node {
 	i.l.Lock()
 	defer i.l.Unlock()

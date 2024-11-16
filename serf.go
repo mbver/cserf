@@ -306,6 +306,24 @@ func (s *Serf) ID() string {
 	return s.mlist.ID()
 }
 
+func numToString(n int) string {
+	return strconv.FormatUint(uint64(n), 10)
+}
+func (s *Serf) Stats() map[string]string {
+	m := make(map[string]string)
+	m["active"] = numToString(s.mlist.NumActive())
+	m["failed"] = numToString(s.inactive.numFailed())
+	m["left"] = numToString(s.inactive.numLeft())
+	m["health_score"] = numToString(s.mlist.Health())
+	m["action_time"] = numToString(int(s.action.clock.time))
+	m["query_time"] = numToString(int(s.query.clock.time))
+	m["action_queued"] = numToString(s.broadcasts.actionBroadcasts.Len())
+	m["query_queued"] = numToString(s.broadcasts.queryBroadcasts.Len())
+	m["coordinate_resets"] = numToString(s.ping.coord.NumResets())
+	m["encrypted"] = fmt.Sprintf("%t", s.mlist.EncryptionEnabled())
+	return m
+}
+
 func (s *Serf) setState(state SerfStateType) {
 	s.stateL.Lock()
 	defer s.stateL.Unlock()

@@ -118,7 +118,41 @@ func TestSerf_Query_FilterNodes(t *testing.T) {
 }
 
 func TestSerf_Query_Duplicate(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+	respCh := make(chan *QueryResponse, 3)
+	s.query.setResponseHandler(3, 123, respCh, 10*time.Second)
 
+	ip, port, err := s.mlist.GetAdvertiseAddr()
+	require.Nil(t, err)
+	msg := msgQuery{
+		LTime:      3,
+		ID:         123,
+		SourceIP:   ip,
+		SourcePort: port,
+	}
+
+	encoded, err := encode(msgQueryType, msg)
+	require.Nil(t, err)
+	s.handleQuery(encoded)
+	s.handleQuery(encoded)
+
+	resMsg := msgQueryResponse{
+		LTime: 3,
+		ID:    123,
+		From:  s.ID(),
+	}
+	encoded, err = encode(msgQueryRespType, resMsg)
+	require.Nil(t, err)
+	s.handleQueryResponse(encoded)
+	s.query.invokeResponseHandler(&resMsg)
+
+	time.Sleep(50 * time.Millisecond)
+
+	require.Equal(t, 1, len(respCh))
+	qResp := <-respCh
+	require.Equal(t, s.ID(), qResp.From)
 }
 
 func TestSerf_IsQueryAccepted(t *testing.T) {

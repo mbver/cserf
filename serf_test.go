@@ -288,6 +288,7 @@ func TestSerf_EventJoinShutdown(t *testing.T) {
 	require.True(t, success, msg)
 }
 
+// TODO: this test fails but very rarely. inspect it more intensively
 func TestSerf_EventLeave(t *testing.T) {
 	eventCh := make(chan Event, 10)
 	_, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
@@ -464,9 +465,7 @@ func TestSerf_JoinLeave(t *testing.T) {
 
 	time.Sleep(2*s2.config.ReapInterval + s2.config.TombstoneTimeout)
 
-	s2.inactive.l.Lock()
-	nLeft := len(s2.inactive.left)
-	s2.inactive.l.Unlock()
+	nLeft := s2.inactive.numLeft()
 	require.Zero(t, nLeft)
 
 	require.Equal(t, 1, s2.mlist.NumActive())
@@ -679,6 +678,29 @@ func TestSerf_ReapHandlerShutdown(t *testing.T) {
 	}()
 	err = <-errCh
 	require.Nil(t, err)
+}
+
+func TestSerf_Stats(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+
+	stats := s.Stats()
+	exp := map[string]string{
+		"active":            "1",
+		"failed":            "0",
+		"left":              "0",
+		"health_score":      "0",
+		"action_time":       "0",
+		"query_time":        "0",
+		"action_queued":     "0",
+		"query_queued":      "0",
+		"coordinate_resets": "0",
+		"encrypted":         "true",
+	}
+	for k, v := range exp {
+		require.Equal(t, v, stats[k])
+	}
 }
 
 func retry(times int, fn func() (bool, string)) (success bool, msg string) {
