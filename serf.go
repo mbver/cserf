@@ -45,7 +45,7 @@ type Serf struct {
 	invokeScriptCh chan *invokeScript
 	eventHandlers  *eventHandlerManager
 	mlist          *memberlist.Memberlist
-	ping           *pingDelegate
+	ping           PingDelegate
 	usrState       *userStateDelegate
 	broadcasts     *broadcastManager
 	query          *QueryManager
@@ -66,6 +66,7 @@ type SerfBuilder struct {
 	keyring *memberlist.Keyring
 	logger  *log.Logger
 	tags    map[string]string
+	ping    PingDelegate
 }
 
 func (b *SerfBuilder) WithMemberlistConfig(conf *memberlist.Config) {
@@ -86,6 +87,10 @@ func (b *SerfBuilder) WithLogger(l *log.Logger) {
 
 func (b *SerfBuilder) WithTags(tags map[string]string) {
 	b.tags = tags
+}
+
+func (b *SerfBuilder) WithPingDelegate(p PingDelegate) {
+	b.ping = p
 }
 
 func (b *SerfBuilder) Build() (*Serf, error) {
@@ -146,10 +151,14 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.broadcasts = broadcasts
 	mbuilder.WithUserBroadcasts(broadcasts)
 
-	ping, err := newPingDelegate(b.logger)
-	if err != nil {
-		return nil, err
+	ping := b.ping
+	if ping == nil {
+		ping, err = newPingDelegate(b.logger)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	s.ping = ping
 	mbuilder.WithPingDelegate(ping)
 
@@ -188,7 +197,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 		return nil, err
 	}
 	s.mlist = m
-	s.ping.id = m.ID()
+	s.ping.SetID(m.ID())
 
 	addr, err := s.AdvertiseAddress()
 	if err != nil {
@@ -327,7 +336,7 @@ func (s *Serf) Stats() map[string]string {
 	m["query_time"] = numToString(int(s.query.clock.time))
 	m["action_queued"] = numToString(s.broadcasts.actionBroadcasts.Len())
 	m["query_queued"] = numToString(s.broadcasts.queryBroadcasts.Len())
-	m["coordinate_resets"] = numToString(s.ping.coord.NumResets())
+	m["coordinate_resets"] = numToString(s.ping.GetNumResets())
 	m["encrypted"] = fmt.Sprintf("%t", s.mlist.EncryptionEnabled())
 	return m
 }

@@ -9,6 +9,16 @@ import (
 	memberlist "github.com/mbver/mlist"
 )
 
+type PingDelegate interface {
+	SetID(string)
+	Payload() []byte
+	Finish(*memberlist.Node, time.Duration, []byte)
+	GetCachedCoord(string) *coordinate.Coordinate
+	RemoveCachedCoord(string)
+	GetCoordinate() *coordinate.Coordinate
+	GetNumResets() int
+}
+
 type pingDelegate struct {
 	id         string // id only ready when mlist started
 	coord      *coordinate.Node
@@ -27,6 +37,10 @@ func newPingDelegate(logger *log.Logger) (*pingDelegate, error) {
 		coordCache: make(map[string]*coordinate.Coordinate),
 		logger:     logger,
 	}, nil
+}
+
+func (p *pingDelegate) SetID(id string) {
+	p.id = id
 }
 
 func (p *pingDelegate) Payload() []byte {
@@ -73,8 +87,16 @@ func (p *pingDelegate) RemoveCachedCoord(id string) {
 	delete(p.coordCache, id)
 }
 
+func (p *pingDelegate) GetCoordinate() *coordinate.Coordinate {
+	return p.coord.GetCoordinate()
+}
+
+func (p *pingDelegate) GetNumResets() int {
+	return p.coord.NumResets()
+}
+
 func (s *Serf) GetCoordinate() *coordinate.Coordinate {
-	return s.ping.coord.GetCoordinate()
+	return s.ping.GetCoordinate()
 }
 
 func (s *Serf) GetCachedCoord(id string) *coordinate.Coordinate {

@@ -115,6 +115,7 @@ type testNodeOpts struct {
 	port   int
 	snap   string
 	script string
+	ping   PingDelegate
 }
 
 func testNode(opts *testNodeOpts) (*Serf, func(), error) {
@@ -184,6 +185,8 @@ func testNode(opts *testNodeOpts) (*Serf, func(), error) {
 	b.WithConfig(conf)
 
 	b.WithTags(opts.tags)
+
+	b.WithPingDelegate(opts.ping)
 
 	s, err := b.Build()
 	if err != nil {
