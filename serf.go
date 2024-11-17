@@ -147,7 +147,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	s.userMsgCh = usrMsgCh
 	mbuilder.WithUserMessageCh(usrMsgCh)
 
-	broadcasts := newBroadcastManager(s.NumNodes, b.mconf.RetransmitMult, b.conf.MaxQueueDepth) // TODO: add a logger then?
+	broadcasts := newBroadcastManager(s.NumNodes, b.mconf.RetransmitMult, b.conf.MaxQueueDepth, b.conf.MinQueueDepth) // TODO: add a logger then?
 	s.broadcasts = broadcasts
 	mbuilder.WithUserBroadcasts(broadcasts)
 

@@ -5,14 +5,18 @@ import (
 )
 
 type broadcastManager struct {
+	numNodes         func() int
 	maxQueueDepth    int
+	minQueueDepth    int
 	actionBroadcasts *memberlist.TransmitCapQueue
 	queryBroadcasts  *memberlist.TransmitCapQueue
 }
 
-func newBroadcastManager(numNodes func() int, transmitScale int, maxQueueDepth int) *broadcastManager {
+func newBroadcastManager(numNodes func() int, transmitScale int, maxQueueDepth int, minQueueDepth int) *broadcastManager {
 	return &broadcastManager{
+		numNodes:         numNodes,
 		maxQueueDepth:    maxQueueDepth,
+		minQueueDepth:    minQueueDepth,
 		actionBroadcasts: memberlist.NewBroadcastQueue(numNodes, transmitScale),
 		queryBroadcasts:  memberlist.NewBroadcastQueue(numNodes, transmitScale),
 	}
@@ -44,10 +48,26 @@ func (m *broadcastManager) broadcastAction(t msgType, msg msgAction, notify chan
 	m.actionBroadcasts.QueueMsg("", t, msg, notify)
 }
 
+func (m *broadcastManager) maxQueueLen() int {
+	max := m.maxQueueDepth
+	if m.minQueueDepth > 0 {
+		max = 2 * m.numNodes()
+		if max < m.minQueueDepth {
+			max = m.minQueueDepth
+		}
+	}
+	return max
+}
+
 func (m *broadcastManager) manageQueueDepth() {
-	if m.maxQueueDepth == 0 {
+	max := m.maxQueueLen()
+	if max == 0 {
 		return
 	}
-	m.actionBroadcasts.Resize(m.maxQueueDepth)
-	m.queryBroadcasts.Resize(m.maxQueueDepth)
+	if m.actionBroadcasts.Len() > max {
+		m.actionBroadcasts.Resize(max)
+	}
+	if m.queryBroadcasts.Len() > max {
+		m.queryBroadcasts.Resize(max)
+	}
 }
