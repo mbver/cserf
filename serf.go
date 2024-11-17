@@ -311,6 +311,10 @@ func (s *Serf) Members() []*memberlist.Node {
 	return s.mlist.Members()
 }
 
+func (s *Serf) LocalMember() *memberlist.Node {
+	return s.mlist.LocalNodeState().Node
+}
+
 func (s *Serf) AdvertiseAddress() (string, error) {
 	ip, port, err := s.mlist.GetAdvertiseAddr()
 	if err != nil {

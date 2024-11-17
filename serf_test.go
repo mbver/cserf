@@ -771,6 +771,29 @@ func TestSerf_Stats(t *testing.T) {
 	}
 }
 
+func TestSerf_LocalMember(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+
+	n := s.LocalMember()
+	require.Equal(t, n.ID, s.ID())
+	tags, err := decodeTags(n.Tags)
+	require.Nil(t, err)
+	require.True(t, reflect.DeepEqual(tags, s.tags))
+	newTags := map[string]string{
+		"foo": "bar",
+		"tea": "milk",
+	}
+	err = s.SetTags(newTags)
+	require.Nil(t, err)
+
+	n = s.LocalMember()
+	tags, err = decodeTags(n.Tags)
+	require.Nil(t, err)
+	require.True(t, reflect.DeepEqual(tags, newTags))
+}
+
 func retry(times int, fn func() (bool, string)) (success bool, msg string) {
 	for i := 0; i < times; i++ {
 		success, msg = fn()
