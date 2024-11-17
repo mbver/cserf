@@ -1,10 +1,14 @@
 package serf
 
 import (
+	"fmt"
+	"log"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
+	memberlist "github.com/mbver/mlist"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,4 +61,101 @@ func TestSerf_SnapshotRecovery(t *testing.T) {
 	output, err := os.ReadFile(testSnapRecoverOutput)
 	require.Nil(t, err)
 	require.NotContains(t, string(output), "action")
+}
+
+func fetchEvent(ch chan Event) (Event, error) {
+	select {
+	case e := <-ch:
+		return e, nil
+	case <-time.After(20 * time.Millisecond):
+		return nil, fmt.Errorf("timeout fetching event")
+	}
+}
+
+func TestSnapshotter(t *testing.T) {
+	inCh := make(chan Event, 100)
+	snapPath := tmpPath()
+	defer os.Remove(snapPath)
+	logger := log.New(os.Stderr, "snapshotter-test: ", log.LstdFlags)
+	shutdown := make(chan struct{}) // WHERE TO CLEANUP WITH SHUTDOWN?
+	closed := false
+	defer func() {
+		if !closed {
+			close(shutdown)
+		}
+	}()
+	snap, outCh, err := NewSnapshotter(
+		snapPath,
+		1024,
+		20*time.Millisecond,
+		logger,
+		inCh,
+		shutdown,
+	)
+	require.Nil(t, err)
+
+	aEvent := ActionEvent{
+		LTime: 42,
+		Name:  "bar",
+	}
+	inCh <- &aEvent
+
+	qEvent := QueryEvent{
+		LTime: 50,
+		Name:  "uptime",
+	}
+	inCh <- &qEvent
+
+	jEvent := MemberEvent{
+		Type: EventMemberJoin,
+		Member: &memberlist.Node{
+			ID:   "foo",
+			IP:   []byte{127, 0, 0, 1},
+			Port: 5000,
+		},
+	}
+	fEvent := MemberEvent{
+		Type: EventMemberFailed,
+		Member: &memberlist.Node{
+			ID:   "foo",
+			IP:   []byte{127, 0, 0, 1},
+			Port: 5000,
+		},
+	}
+	inCh <- &jEvent
+	inCh <- &fEvent
+	inCh <- &jEvent
+
+	for _, e := range []Event{&aEvent, &qEvent, &jEvent, &fEvent, &jEvent} {
+		event, err := fetchEvent(outCh)
+		require.Nil(t, err)
+		require.True(t,
+			reflect.DeepEqual(event, e),
+			fmt.Sprintf("unmatched: expect: %+v, got: %+v", e, event))
+	}
+
+	closed = true
+	close(shutdown)
+	snap.Wait()
+
+	shutdown = make(chan struct{})
+	closed = false
+
+	snap, _, err = NewSnapshotter(
+		snapPath,
+		1024,
+		20*time.Millisecond,
+		logger,
+		inCh,
+		shutdown,
+	)
+	require.Nil(t, err)
+
+	require.Equal(t, LamportTime(42), snap.LastActionClock())
+	require.Equal(t, LamportTime(50), snap.LastQueryClock())
+
+	prev := snap.AliveNodes()
+	require.Equal(t, 1, len(prev))
+	require.Equal(t, "foo", prev[0].ID)
+	require.Equal(t, "127.0.0.1:5000", prev[0].Addr)
 }

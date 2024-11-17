@@ -118,6 +118,11 @@ type testNodeOpts struct {
 	ping   PingDelegate
 }
 
+func tmpPath() string {
+	f := strconv.Itoa(rand.Int())
+	return filepath.Join(os.TempDir(), f)
+}
+
 func testNode(opts *testNodeOpts) (*Serf, func(), error) {
 	if opts == nil {
 		opts = &testNodeOpts{}
@@ -151,8 +156,7 @@ func testNode(opts *testNodeOpts) (*Serf, func(), error) {
 
 	snapPath := opts.snap
 	if snapPath == "" {
-		snapfile := strconv.Itoa(rand.Int())
-		snapPath = filepath.Join(os.TempDir(), snapfile)
+		snapPath = tmpPath()
 	}
 	script := opts.script
 	if script == "" {
