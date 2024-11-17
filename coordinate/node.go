@@ -150,7 +150,7 @@ func (n *Node) addLatency(node string, rttSeconds float64) float64 {
 // given from-coord and rtt, apply force to current coord to move it to balance
 func (n *Node) relax(from *Coordinate, rttSeconds float64) {
 
-	dist := TimeDist(n.coord, from).Seconds()
+	dist := n.coord.DistanceTo(from).Seconds()
 	if rttSeconds < zeroThreshold {
 		rttSeconds = zeroThreshold
 	}
@@ -190,7 +190,7 @@ func (n *Node) adjust(other *Coordinate, rttSeconds float64) {
 // pull the coord slightly toward center
 // to combat drift
 func (n *Node) centerNudge() {
-	dist := TimeDist(n.origin, n.coord).Seconds()
+	dist := n.origin.DistanceTo(n.coord).Seconds()
 	force := -1.0 * math.Pow(dist/n.config.GravityRho, 2.0)
 	n.coord = ApplyForce(n.origin, n.coord.Clone(), n.config.HeightMin, force)
 }
@@ -224,5 +224,5 @@ func (n *Node) DistanceTo(other *Coordinate) time.Duration {
 	n.l.RLock()
 	defer n.l.RUnlock()
 
-	return TimeDist(n.coord, other)
+	return n.coord.DistanceTo(other)
 }

@@ -83,13 +83,13 @@ func ApplyForce(from, to *Coordinate, minHeight, force float64) *Coordinate {
 
 // distance between 2 points in time.Duration
 // with adjustment included
-func TimeDist(this, that *Coordinate) time.Duration {
-	if !matchDim(this, that) {
+func (c *Coordinate) DistanceTo(other *Coordinate) time.Duration {
+	if !matchDim(c, other) {
 		panic(ErrDimMisMatch)
 	}
-	d := distance(this, that)
-	adjusted := d + this.Adjustment + that.Adjustment
-	if adjusted <= 0 { // adjust fails
+	d := distance(c, other)
+	adjusted := d + c.Adjustment + other.Adjustment
+	if adjusted <= 0 {
 		adjusted = d
 	}
 	return secondsToDuration(adjusted)

@@ -98,7 +98,7 @@ func TestCoordinate_ApplyForce(t *testing.T) {
 
 	// push-away from itself. moves in random direction
 	c = ApplyForce(origin, origin, config.HeightMin, 1.0)
-	require.True(t, isFloatEqual(TimeDist(c, origin).Seconds(), 1.0))
+	require.True(t, isFloatEqual(c.DistanceTo(origin).Seconds(), 1.0))
 
 	config.HeightMin = 10.0e-6
 	origin = NewCoordinate(config)
@@ -130,28 +130,28 @@ func TestCoordinate_TimeDistance(t *testing.T) {
 	c1.Euclide = []float64{-0.5, 1.3, 2.4}
 	c2.Euclide = []float64{1.2, -2.3, 3.4}
 
-	require.True(t, isFloatEqual(TimeDist(c1, c1).Seconds(), 0.0))
-	require.True(t, isFloatEqual(TimeDist(c1, c2).Seconds(), TimeDist(c2, c1).Seconds()))
-	require.True(t, isFloatEqual(TimeDist(c1, c2).Seconds(), 4.104875150354758))
+	require.True(t, isFloatEqual(c1.DistanceTo(c1).Seconds(), 0.0))
+	require.True(t, isFloatEqual(c1.DistanceTo(c2).Seconds(), c2.DistanceTo(c1).Seconds()))
+	require.True(t, isFloatEqual(c1.DistanceTo(c2).Seconds(), 4.104875150354758))
 
 	// Make sure negative adjustment factors are ignored.
 	c1.Adjustment = -1.0e6
-	require.True(t, isFloatEqual(TimeDist(c1, c2).Seconds(), 4.104875150354758))
+	require.True(t, isFloatEqual(c1.DistanceTo(c2).Seconds(), 4.104875150354758))
 
 	// Make sure positive adjustment factors affect the distance.
 	c1.Adjustment = 0.1
 	c2.Adjustment = 0.2
-	require.True(t, isFloatEqual(TimeDist(c1, c2).Seconds(), 4.104875150354758+0.3))
+	require.True(t, isFloatEqual(c1.DistanceTo(c2).Seconds(), 4.104875150354758+0.3))
 
 	// Make sure the heights affect the distance.
 	c1.Height = 0.7
 	c2.Height = 0.1
-	require.True(t, isFloatEqual(TimeDist(c1, c2).Seconds(), 4.104875150354758+0.3+0.8))
+	require.True(t, isFloatEqual(c1.DistanceTo(c2).Seconds(), 4.104875150354758+0.3+0.8))
 
 	bad := c1.Clone()
 	bad.Euclide = make([]float64, len(bad.Euclide)+1)
 	ch := make(chan bool, 1)
-	catchDimensionPanic(func() { TimeDist(c1, bad) }, ch)
+	catchDimensionPanic(func() { c1.DistanceTo(bad) }, ch)
 	require.True(t, <-ch)
 }
 
