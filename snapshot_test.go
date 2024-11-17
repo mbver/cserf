@@ -63,6 +63,44 @@ func TestSerf_SnapshotRecovery(t *testing.T) {
 	require.NotContains(t, string(output), "action")
 }
 
+func getShutdownCh() (chan struct{}, func()) {
+	shutdown := make(chan struct{})
+	getCleanup := func() func() {
+		closed := false
+		return func() {
+			if !closed {
+				closed = true
+				close(shutdown)
+			}
+		}
+	}
+	return shutdown, getCleanup()
+}
+
+func testSnapshotter(name string, path string, drainTimeout time.Duration) (chan Event, chan Event, func(), *Snapshotter, func(), error) {
+	inCh := make(chan Event, 100)
+	snapPath := path
+	if snapPath == "" {
+		snapPath = tmpPath()
+	}
+	if drainTimeout == 0 {
+		drainTimeout = 20 * time.Millisecond
+	}
+	cleanup := func() { os.Remove(snapPath) }
+	logger := log.New(os.Stderr, name, log.LstdFlags)
+	shutdown, closeShutdown := getShutdownCh()
+	cleanup1 := combineCleanup(cleanup, closeShutdown)
+	snap, outCh, err := NewSnapshotter(
+		snapPath,
+		1024,
+		drainTimeout,
+		logger,
+		inCh,
+		shutdown,
+	)
+	return inCh, outCh, closeShutdown, snap, cleanup1, err
+}
+
 func fetchEvent(ch chan Event) (Event, error) {
 	select {
 	case e := <-ch:
@@ -73,25 +111,8 @@ func fetchEvent(ch chan Event) (Event, error) {
 }
 
 func TestSnapshotter(t *testing.T) {
-	inCh := make(chan Event, 100)
-	snapPath := tmpPath()
-	defer os.Remove(snapPath)
-	logger := log.New(os.Stderr, "snapshotter-test: ", log.LstdFlags)
-	shutdown := make(chan struct{}) // WHERE TO CLEANUP WITH SHUTDOWN?
-	closed := false
-	defer func() {
-		if !closed {
-			close(shutdown)
-		}
-	}()
-	snap, outCh, err := NewSnapshotter(
-		snapPath,
-		1024,
-		20*time.Millisecond,
-		logger,
-		inCh,
-		shutdown,
-	)
+	inCh, outCh, closeShutdown, snap, cleanup, err := testSnapshotter("test-snapshotter", "", 0)
+	defer cleanup()
 	require.Nil(t, err)
 
 	aEvent := ActionEvent{
@@ -134,21 +155,11 @@ func TestSnapshotter(t *testing.T) {
 			fmt.Sprintf("unmatched: expect: %+v, got: %+v", e, event))
 	}
 
-	closed = true
-	close(shutdown)
+	closeShutdown()
 	snap.Wait()
 
-	shutdown = make(chan struct{})
-	closed = false
-
-	snap, _, err = NewSnapshotter(
-		snapPath,
-		1024,
-		20*time.Millisecond,
-		logger,
-		inCh,
-		shutdown,
-	)
+	_, _, _, snap, cleanup1, err := testSnapshotter("new-snapshot: ", snap.path, 0)
+	defer cleanup1()
 	require.Nil(t, err)
 
 	require.Equal(t, LamportTime(42), snap.LastActionClock())
@@ -158,4 +169,38 @@ func TestSnapshotter(t *testing.T) {
 	require.Equal(t, 1, len(prev))
 	require.Equal(t, "foo", prev[0].ID)
 	require.Equal(t, "127.0.0.1:5000", prev[0].Addr)
+}
+
+func TestSnapshotter_ForceCompact(t *testing.T) {
+	inCh, outCh, closeShutdown, snap, cleanup, err := testSnapshotter("snap-force-compact", "", 250*time.Millisecond)
+	defer cleanup()
+	require.Nil(t, err)
+
+	go func() { // drain outCh
+		for i := 0; i < 2048; i++ {
+			<-outCh
+		}
+	}()
+
+	for i := 0; i < 1024; i++ {
+		inCh <- &ActionEvent{
+			LTime: LamportTime(i),
+		}
+	}
+	for i := 0; i < 1024; i++ {
+		inCh <- &QueryEvent{
+			LTime: LamportTime(i),
+		}
+	}
+	closeShutdown()
+	snap.Wait()
+	_, _, _, snap, cleanup1, err := testSnapshotter("new-snap-force-compact", snap.path, 0)
+	defer cleanup1()
+	require.Nil(t, err)
+	require.Equal(
+		t, LamportTime(1023), snap.LastActionClock(),
+		fmt.Sprintf("got: %d", snap.LastActionClock()))
+	require.Equal(
+		t, LamportTime(1023), snap.LastQueryClock(),
+		fmt.Sprintf("got: %d", snap.LastQueryClock()))
 }

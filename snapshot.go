@@ -24,7 +24,7 @@ const (
 	snapshotCompactionFactor = 2 // compact_threshold = numNodes * bytesPerNode * factor
 )
 
-var snapshotPrefixes = []string{"alive: ", "not alive: ", "clock: ", "action-clock: ", "query-clock: ", "coordinate: ", "leave", "#"}
+var snapshotPrefixes = []string{"alive: ", "not-alive: ", "action-clock: ", "query-clock: ", "coordinate: ", "leave", "#"}
 
 type Snapshotter struct {
 	aliveNodes      map[string]string
@@ -33,7 +33,6 @@ type Snapshotter struct {
 	offset          int64
 	buffer          *bufio.Writer
 	teeCh           chan Event
-	lastClock       LamportTime
 	lastActionClock LamportTime
 	lastQueryClock  LamportTime
 	lastFlush       time.Time
@@ -83,7 +82,6 @@ func NewSnapshotter(path string,
 		buffer:          bufio.NewWriter(fh),
 		offset:          offset,
 		teeCh:           make(chan Event, eventChSize),
-		lastClock:       0,
 		lastActionClock: 0,
 		lastQueryClock:  0,
 		leaveCh:         make(chan struct{}),
@@ -147,6 +145,9 @@ func (s *Snapshotter) receiveEvents() {
 	defer func() {
 		if err := s.buffer.Flush(); err != nil {
 			s.logger.Printf("[ERR] serf: failed to flush snapshot: %v", err)
+		}
+		if err := s.fh.Sync(); err != nil {
+			s.logger.Printf("[ERR] serf: failed to sync snapshot: %v", err)
 		}
 		s.fh.Close()
 		close(s.stopCh)
@@ -303,15 +304,8 @@ func (s *Snapshotter) dump() error {
 		}
 	}
 
-	// Write out the clocks
-	line := fmt.Sprintf("clock: %d\n", s.lastClock)
-	_, err = buf.WriteString(line)
-	if err != nil {
-		return err
-	}
-
 	// Write out the event clock
-	line = fmt.Sprintf("action-clock: %d\n", s.lastActionClock)
+	line := fmt.Sprintf("action-clock: %d\n", s.lastActionClock)
 	_, err = buf.WriteString(line)
 	if err != nil {
 		return err
