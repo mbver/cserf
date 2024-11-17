@@ -74,7 +74,7 @@ type QueryManager struct {
 
 func newQueryManager(logger *log.Logger, bufferSize int) *QueryManager {
 	return &QueryManager{
-		clock:    &LamportClock{},
+		clock:    &LamportClock{1},
 		buffers:  make([]*lGroupItem, bufferSize),
 		handlers: make(map[LamportTime]*QueryResponseHandler),
 		logger:   logger,
@@ -145,11 +145,9 @@ func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) error {
 	if err != nil {
 		return err
 	}
-	lTime := s.query.clock.Time()
-	s.query.clock.Next()
 	q := msgQuery{
 		Name:       params.Name,
-		LTime:      lTime,
+		LTime:      s.query.clock.Time(), // witness will auto-increase
 		ID:         rand.Uint32(),
 		SourceIP:   addr,
 		SourcePort: port,

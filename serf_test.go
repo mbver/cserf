@@ -756,15 +756,15 @@ func TestSerf_Stats(t *testing.T) {
 		"failed":            "0",
 		"left":              "0",
 		"health_score":      "0",
-		"action_time":       "0",
-		"query_time":        "0",
+		"action_time":       "1",
+		"query_time":        "1",
 		"action_queued":     "0",
 		"query_queued":      "0",
 		"coordinate_resets": "0",
 		"encrypted":         "true",
 	}
 	for k, v := range exp {
-		require.Equal(t, v, stats[k])
+		require.Equal(t, v, stats[k], fmt.Sprintf("%s: expect: %s, got %s", k, v, stats[k]))
 	}
 }
 
