@@ -172,15 +172,9 @@ func TestSnapshotter(t *testing.T) {
 }
 
 func TestSnapshotter_ForceCompact(t *testing.T) {
-	inCh, outCh, closeShutdown, snap, cleanup, err := testSnapshotter("snap-force-compact", "", 250*time.Millisecond)
+	inCh, _, closeShutdown, snap, cleanup, err := testSnapshotter("snap-force-compact", "", 250*time.Millisecond)
 	defer cleanup()
 	require.Nil(t, err)
-
-	go func() { // drain outCh
-		for i := 0; i < 2048; i++ {
-			<-outCh
-		}
-	}()
 
 	for i := 0; i < 1024; i++ {
 		inCh <- &ActionEvent{
