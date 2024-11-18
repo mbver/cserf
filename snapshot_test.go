@@ -253,42 +253,39 @@ func TestSnapshotter_SlowDiskNotBlockingOutEventCh(t *testing.T) {
 	defer cleanup()
 	require.Nil(t, err)
 
+	errCh := make(chan error, 1)
 	numEvents := 10000
-	startCh := make(chan struct{})
-	go func() {
-		<-startCh
-		for i := 0; i < numEvents; i++ {
-			e := &MemberEvent{
-				Type: EventMemberJoin,
-				Member: &memberlist.Node{
-					ID:   fmt.Sprintf("foo%d", i),
-					IP:   []byte{127, 0, byte(i / 256 % 256), byte(i % 256)},
-					Port: 5000,
-				},
-			}
-			if i%10 == 0 {
-				e.Type = EventMemberLeave
-			}
-			inCh <- e
-			time.Sleep(1 * time.Microsecond)
-		}
-	}()
-
-	deadline := time.After(500 * time.Millisecond)
 	numRecvd := 0
-	start := time.Now()
-
-	for numRecvd < numEvents {
-		select {
-		case startCh <- struct{}{}:
-			continue
-		case <-outCh:
-			numRecvd++
-		case <-deadline:
-			t.Fatalf("timed out after %s waiting for messages blocked on fake disk IO? "+
-				"got %d of %d", time.Since(start), numRecvd, numEvents)
+	timeoutCh := time.After(500 * time.Millisecond)
+	go func() {
+		for numRecvd < numEvents {
+			select {
+			case <-outCh:
+				numRecvd++
+			case <-timeoutCh:
+				errCh <- fmt.Errorf("timeout")
+			}
 		}
+		errCh <- nil
+	}()
+	for i := 0; i < numEvents; i++ {
+		e := &MemberEvent{
+			Type: EventMemberJoin,
+			Member: &memberlist.Node{
+				ID:   fmt.Sprintf("foo%d", i),
+				IP:   []byte{127, 0, byte(i / 256 % 256), byte(i % 256)},
+				Port: 5000,
+			},
+		}
+		if i%10 == 0 {
+			e.Type = EventMemberLeave
+		}
+		inCh <- e
+		time.Sleep(1 * time.Microsecond)
 	}
+
+	err = <-errCh
+	require.Nil(t, err)
 }
 
 func slowDownStreamSnapshotter(inCh chan Event) (*Snapshotter, func(), error) {
