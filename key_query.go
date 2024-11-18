@@ -227,9 +227,10 @@ func (s *Serf) trySendlistKeyResponse(q *QueryEvent, r *KeyResponse) {
 	if nKeys > len(r.Keys) {
 		nKeys = len(r.Keys)
 	}
+	length := len(r.Keys)
 	for i := nKeys; i > 0; i-- {
 		r.Keys = r.Keys[:i]
-		if i < len(r.Keys) {
+		if i < length {
 			r.Err = "key-list truncated"
 		}
 		err := s.sendKeyResponse(q, r)

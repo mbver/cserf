@@ -310,3 +310,80 @@ func TestSerf_ListKey(t *testing.T) {
 		require.Equal(t, 2, v, fmt.Sprintf("got %d", v))
 	}
 }
+
+func genTestKeys(n int) []string {
+	res := make([]string, n)
+	for i := 0; i < n; i++ {
+		key := make([]byte, 32)
+		for j := 0; j < 32; j++ {
+			key[j] = byte(randIntN(256))
+		}
+		res[i] = base64.StdEncoding.EncodeToString(key)
+	}
+	return res
+}
+
+func TestSerf_ListKey_Truncated(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoined()
+	defer cleanup()
+	require.Nil(t, err)
+
+	cases := []struct {
+		keys     []string
+		expected int
+		err      bool
+	}{
+		{
+			[]string{"KfCPZAKdgHUOdb202afZfE8EbdZqj4+ReTbfJUkfKsg="},
+			2,
+			false,
+		},
+		{
+			genTestKeys(50),
+			18,
+			true,
+		},
+		{
+			genTestKeys(40),
+			18,
+			true,
+		},
+		{
+			genTestKeys(18),
+			18,
+			true,
+		},
+		{
+			genTestKeys(15),
+			16,
+			false,
+		},
+	}
+
+	for _, c := range cases {
+		addedKeys := make([][]byte, len(c.keys))
+		for i, keyEnc := range c.keys {
+			k, err := base64.StdEncoding.DecodeString(keyEnc)
+			require.Nil(t, err)
+			err = s2.keyring.AddKey(k)
+			addedKeys[i] = k
+			require.Nil(t, err)
+		}
+
+		resp, err := s1.KeyQuery("list", "")
+		require.Nil(t, err)
+		require.Equal(t, 2, resp.NumNode)
+		require.Equal(t, 2, resp.NumResp)
+		require.Equal(t, !c.err, len(resp.ErrFrom) == 0)
+		if len(resp.ErrFrom) != 0 {
+			require.Contains(t, resp.ErrFrom[s2.ID()], "truncated")
+		}
+		require.Equal(t, c.expected, len(resp.KeyCount))
+
+		// cleanup for next test
+		for _, k := range addedKeys {
+			err = s2.keyring.RemoveKey(k)
+			require.Nil(t, err)
+		}
+	}
+}
