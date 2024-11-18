@@ -72,3 +72,36 @@ func TestSerf_Action_SizeLimit(t *testing.T) {
 	require.NotNil(t, err)
 	require.True(t, errors.Is(err, ErrActionSizeLimitExceed))
 }
+
+func TestSerf_Action_OldMsg(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+
+	s.action.clock.Witness(LamportTime(s.config.LBufferSize + 1000))
+	msg := msgAction{
+		LTime:   1,
+		Name:    "old",
+		Payload: nil,
+	}
+	require.False(t, s.action.addToBuffer(&msg))
+}
+
+func TestSerf_Action_SameClock(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+
+	msg := msgAction{
+		LTime: 1,
+		ID:    1,
+		Name:  "first",
+	}
+	require.True(t, s.action.addToBuffer(&msg), "should be added")
+
+	msg.ID = 2
+	require.True(t, s.action.addToBuffer(&msg), "should be added")
+
+	msg.ID = 3
+	require.True(t, s.action.addToBuffer(&msg), "should be added")
+}

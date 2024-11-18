@@ -3,6 +3,7 @@ package serf
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -220,4 +221,81 @@ func TestSerf_IsQueryAccepted(t *testing.T) {
 			t.Errorf("result for %+v not matched. expect %t, got %t", q, c.accepted, accepted)
 		}
 	}
+}
+
+func TestQuery_DefaultParams(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+
+	p := s.DefaultQueryParams()
+	require.Nil(t, p.ForNodes)
+	require.Nil(t, p.FilterTags)
+	require.Equal(t,
+		s.mlist.GossipInterval()*time.Duration(s.config.QueryTimeoutMult),
+		p.Timeout)
+}
+
+func TestSerf_EncodeDecodeRelay(t *testing.T) {
+	resp := msgQueryResponse{
+		LTime:   1,
+		ID:      123,
+		From:    "foo",
+		Payload: []byte("something"),
+	}
+	encResp, err := encode(msgQueryRespType, resp)
+	require.Nil(t, err)
+	require.Equal(t, byte(msgQueryRespType), encResp[0])
+
+	relay := msgRelay{
+		Msg:      encResp,
+		DestIP:   []byte{127, 0, 0, 1},
+		DestPort: 5000,
+	}
+	encRelay, err := encode(msgRelayType, relay)
+	require.Nil(t, err)
+	require.Equal(t, byte(msgRelayType), encRelay[0])
+
+	var decRelay msgRelay
+	decode(encRelay[1:], &decRelay)
+	require.True(t, reflect.DeepEqual(relay, decRelay))
+
+	encResp = decRelay.Msg
+	require.Equal(t, byte(msgQueryRespType), encResp[0])
+	var decResp msgQueryResponse
+	decode(encResp[1:], &decResp)
+	require.True(t, reflect.DeepEqual(resp, decResp))
+}
+
+func TestSerf_Query_OldMsg(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+
+	s.query.clock.Witness(LamportTime(s.config.LBufferSize + 1000))
+	msg := msgQuery{
+		LTime:   1,
+		Name:    "old",
+		Payload: nil,
+	}
+	require.False(t, s.query.addToBuffer(&msg))
+}
+
+func TestSerf_Query_SameClock(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+
+	msg := msgQuery{
+		LTime: 1,
+		ID:    1,
+		Name:  "first",
+	}
+	require.True(t, s.query.addToBuffer(&msg), "should be added")
+
+	msg.ID = 2
+	require.True(t, s.query.addToBuffer(&msg), "should be added")
+
+	msg.ID = 3
+	require.True(t, s.query.addToBuffer(&msg), "should be added")
 }
