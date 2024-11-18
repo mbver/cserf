@@ -110,12 +110,13 @@ func combineCleanup(cleanups ...func()) func() {
 }
 
 type testNodeOpts struct {
-	tags   map[string]string
-	ip     net.IP
-	port   int
-	snap   string
-	script string
-	ping   PingDelegate
+	tags    map[string]string
+	ip      net.IP
+	port    int
+	snap    string
+	script  string
+	ping    PingDelegate
+	keyring *memberlist.Keyring
 }
 
 func tmpPath() string {
@@ -130,12 +131,16 @@ func testNode(opts *testNodeOpts) (*Serf, func(), error) {
 	b := &SerfBuilder{}
 	cleanup := func() {}
 
-	key := []byte{79, 216, 231, 114, 9, 125, 153, 178, 238, 179, 230, 218, 77, 54, 187, 171, 185, 207, 73, 74, 215, 193, 176, 226, 217, 216, 91, 182, 168, 171, 223, 187}
-	keyRing, err := memberlist.NewKeyring(nil, key)
-	if err != nil {
-		return nil, cleanup, err
+	keyring := opts.keyring
+	var err error
+	if keyring == nil {
+		key := []byte{79, 216, 231, 114, 9, 125, 153, 178, 238, 179, 230, 218, 77, 54, 187, 171, 185, 207, 73, 74, 215, 193, 176, 226, 217, 216, 91, 182, 168, 171, 223, 187}
+		keyring, err = memberlist.NewKeyring(nil, key)
+		if err != nil {
+			return nil, cleanup, err
+		}
 	}
-	b.WithKeyring(keyRing)
+	b.WithKeyring(keyring)
 
 	ip := opts.ip
 	if ip == nil {

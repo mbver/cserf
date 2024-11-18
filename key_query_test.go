@@ -1,11 +1,15 @@
 package serf
 
 import (
+	"bytes"
+	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	memberlist "github.com/mbver/mlist"
 	"github.com/stretchr/testify/require"
 )
 
@@ -78,4 +82,231 @@ func TestSerf_WriteKeyringFile(t *testing.T) {
 	// ensure only the new key are present in the file
 	require.NotContains(t, string(content), existing)
 	require.Contains(t, string(content), newKey)
+}
+
+func testNodeWithKeyring() (*Serf, func(), error) {
+	cleanup := func() {}
+	keysEncoded := []string{
+		"ZWTL+bgjHyQPhJRKcFe3ccirc2SFHmc/Nw67l8NQfdk=",
+		"WbL6oaTPom+7RG7Q/INbJWKy09OLar/Hf2SuOAdoQE4=",
+		"HvY8ubRZMgafUOWvrOadwOckVa1wN3QWAo46FVKbVN8=",
+	}
+	keys := make([][]byte, len(keysEncoded))
+	for i, key := range keysEncoded {
+		decoded, err := base64.StdEncoding.DecodeString(key)
+		if err != nil {
+			return nil, cleanup, err
+		}
+		keys[i] = decoded
+	}
+	kr, err := memberlist.NewKeyring(keys, keys[0])
+	if err != nil {
+		return nil, cleanup, err
+	}
+	return testNode(&testNodeOpts{
+		keyring: kr,
+	})
+}
+
+func twoNodesJoinedWithKeyring() (*Serf, *Serf, func(), error) {
+	s1, cleanup1, err := testNodeWithKeyring()
+	if err != nil {
+		return nil, nil, cleanup1, err
+	}
+	s2, cleanup2, err := testNodeWithKeyring()
+	cleanup := combineCleanup(cleanup1, cleanup2)
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	addr, err := s2.AdvertiseAddress()
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	n, err := s1.Join([]string{addr}, false)
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	if n != 1 {
+		return nil, nil, cleanup, fmt.Errorf("unsuccessful join")
+	}
+	return s1, s2, cleanup, err
+}
+
+func ringHasKey(kr *memberlist.Keyring, keyEnc string) bool {
+	key, err := base64.StdEncoding.DecodeString(keyEnc)
+	if err != nil {
+		return false
+	}
+	for _, k := range kr.GetKeys() {
+		if bytes.Equal(key, k) {
+			return true
+		}
+	}
+	return false
+}
+func TestSerf_InstallKey(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoinedWithKeyring()
+	defer cleanup()
+	require.Nil(t, err)
+	primaryKey := s1.keyring.GetPrimaryKey()
+
+	key := "T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="
+
+	resp, err := s1.KeyQuery("install", key)
+	require.Nil(t, err)
+	require.Equal(t, 2, resp.NumNode)
+	require.Equal(t, 2, resp.NumResp)
+	require.Zero(t, resp.NumErr)
+	require.Zero(t, len(resp.ErrFrom))
+
+	// primary key not changed
+	require.True(t, bytes.Equal(primaryKey, s1.keyring.GetPrimaryKey()))
+	require.True(t, bytes.Equal(primaryKey, s2.keyring.GetPrimaryKey()))
+
+	require.True(t, ringHasKey(s1.keyring, key))
+	require.True(t, ringHasKey(s2.keyring, key))
+}
+
+func TestSerf_UseKey(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoinedWithKeyring()
+	defer cleanup()
+	require.Nil(t, err)
+
+	key := "HvY8ubRZMgafUOWvrOadwOckVa1wN3QWAo46FVKbVN8="
+	resp, err := s1.KeyQuery("use", key)
+	require.Nil(t, err)
+	require.Equal(t, 2, resp.NumNode)
+	require.Equal(t, 2, resp.NumResp)
+	require.Zero(t, resp.NumErr)
+	require.Zero(t, len(resp.ErrFrom))
+
+	// primary key changed
+	keyDec, err := base64.StdEncoding.DecodeString(key)
+	require.Nil(t, err)
+	require.True(t, bytes.Equal(keyDec, s1.keyring.GetPrimaryKey()))
+	require.True(t, bytes.Equal(keyDec, s2.keyring.GetPrimaryKey()))
+}
+
+func TestSerf_UseKey_Rejected(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoinedWithKeyring()
+	defer cleanup()
+	require.Nil(t, err)
+	primaryKey := s1.keyring.GetPrimaryKey()
+
+	key := "T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s=" // non-existent
+	resp, err := s1.KeyQuery("use", key)
+	require.Nil(t, err)
+	require.Equal(t, 2, resp.NumNode)
+	require.Equal(t, 2, resp.NumResp)
+	require.Equal(t, 2, resp.NumErr)
+	require.Equal(t, 2, len(resp.ErrFrom))
+	for _, msg := range resp.ErrFrom {
+		require.Contains(t, msg, "not in keyring")
+	}
+	// primary key not changed
+	require.True(t, bytes.Equal(primaryKey, s1.keyring.GetPrimaryKey()))
+	require.True(t, bytes.Equal(primaryKey, s2.keyring.GetPrimaryKey()))
+}
+
+func TestSerf_RemoveKey(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoinedWithKeyring()
+	defer cleanup()
+	require.Nil(t, err)
+	primaryKey := s1.keyring.GetPrimaryKey()
+
+	key := "HvY8ubRZMgafUOWvrOadwOckVa1wN3QWAo46FVKbVN8="
+	resp, err := s1.KeyQuery("remove", key)
+	require.Nil(t, err)
+	require.Equal(t, 2, resp.NumNode)
+	require.Equal(t, 2, resp.NumResp)
+	require.Zero(t, resp.NumErr)
+	require.Zero(t, len(resp.ErrFrom))
+
+	// primary key notchanged
+	require.True(t, bytes.Equal(primaryKey, s1.keyring.GetPrimaryKey()))
+	require.True(t, bytes.Equal(primaryKey, s2.keyring.GetPrimaryKey()))
+
+	// key is deleted
+	require.False(t, ringHasKey(s1.keyring, key))
+	require.False(t, ringHasKey(s2.keyring, key))
+}
+
+func TestSerf_RemoveKey_Reject_Primary(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoinedWithKeyring()
+	defer cleanup()
+	require.Nil(t, err)
+	primaryKey := s1.keyring.GetPrimaryKey()
+
+	key := "ZWTL+bgjHyQPhJRKcFe3ccirc2SFHmc/Nw67l8NQfdk=" // primary key
+	resp, err := s1.KeyQuery("remove", key)
+	require.Nil(t, err)
+	require.Equal(t, 2, resp.NumNode)
+	require.Equal(t, 2, resp.NumResp)
+	require.Equal(t, 2, resp.NumErr)
+	require.Equal(t, 2, len(resp.ErrFrom))
+
+	// primary key not changed
+	require.True(t, bytes.Equal(primaryKey, s1.keyring.GetPrimaryKey()))
+	require.True(t, bytes.Equal(primaryKey, s2.keyring.GetPrimaryKey()))
+
+	// key is not deleted
+	require.True(t, ringHasKey(s1.keyring, key))
+	require.True(t, ringHasKey(s2.keyring, key))
+}
+
+func TestSerf_RemoveKey_Reject_NonExist(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoinedWithKeyring()
+	defer cleanup()
+	require.Nil(t, err)
+	primaryKey := s1.keyring.GetPrimaryKey()
+
+	key := "T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s=" // non-existent
+	resp, err := s1.KeyQuery("remove", key)
+	require.Nil(t, err)
+	require.Equal(t, 2, resp.NumNode)
+	require.Equal(t, 2, resp.NumResp)
+	require.Equal(t, 2, resp.NumErr)
+	require.Equal(t, 2, len(resp.ErrFrom))
+
+	// primary key notchanged
+	require.True(t, bytes.Equal(primaryKey, s1.keyring.GetPrimaryKey()))
+	require.True(t, bytes.Equal(primaryKey, s2.keyring.GetPrimaryKey()))
+
+	// key is deleted
+	require.False(t, ringHasKey(s1.keyring, key))
+	require.False(t, ringHasKey(s2.keyring, key))
+}
+
+func TestSerf_ListKey(t *testing.T) {
+	s1, s2, cleanup, err := twoNodesJoinedWithKeyring()
+	defer cleanup()
+	require.Nil(t, err)
+	primaryKey := s1.keyring.GetPrimaryKey()
+	require.Equal(t, 3, len(s1.keyring.GetKeys()))
+
+	keyEnc := "5K9OtfP7efFrNKe5WCQvXvnaXJ5cWP0SvXiwe0kkjM4="
+	key, err := base64.StdEncoding.DecodeString(keyEnc)
+	require.Nil(t, err)
+	err = s2.keyring.AddKey(key)
+	require.Nil(t, err)
+
+	resp, err := s1.KeyQuery("list", "")
+	require.Nil(t, err)
+	require.Equal(t, 2, resp.NumNode)
+	require.Equal(t, 2, resp.NumResp)
+	require.Zero(t, resp.NumErr)
+	require.Zero(t, len(resp.ErrFrom))
+
+	require.Equal(t, 1, len(resp.PrimaryKeyCount))
+	enc := base64.StdEncoding.EncodeToString(primaryKey)
+	require.Equal(t, 2, resp.PrimaryKeyCount[enc])
+
+	require.Equal(t, 4, len(resp.KeyCount))
+	for k, v := range resp.KeyCount {
+		if k == keyEnc {
+			require.Equal(t, 1, v, fmt.Sprintf("got %d", v))
+			continue
+		}
+		require.Equal(t, 2, v, fmt.Sprintf("got %d", v))
+	}
 }
