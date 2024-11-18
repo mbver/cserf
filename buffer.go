@@ -1,5 +1,7 @@
 package serf
 
+import "bytes"
+
 type lItem struct {
 	LTime   LamportTime
 	ID      uint32
@@ -7,7 +9,13 @@ type lItem struct {
 }
 
 func (l *lItem) Equal(item *lItem) bool {
-	return l.LTime == item.LTime && l.ID == item.ID
+	if l.LTime != item.LTime {
+		return false
+	}
+	if l.Payload != nil {
+		return bytes.Equal(l.Payload, item.Payload) // for action
+	}
+	return l.ID == item.ID // for query
 }
 
 type lGroupItem struct {

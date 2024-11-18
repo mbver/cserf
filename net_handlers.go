@@ -153,7 +153,6 @@ func (s *Serf) handleAction(msg []byte) {
 	s.inEventCh <- &ActionEvent{
 		LTime:   a.LTime,
 		Name:    a.Name,
-		ID:      a.ID,
 		Payload: a.Payload,
 	}
 }

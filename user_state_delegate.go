@@ -130,7 +130,6 @@ func (u *userStateDelegate) Merge(buf []byte) {
 	for _, group := range msg.ActionBuffer {
 		msgAct.LTime = group.LTime
 		for _, item := range group.Items {
-			msgAct.ID = item.ID
 			msgAct.Payload = item.Payload
 			encoded, err := encode(msgActionType, msgAct)
 			if err != nil {

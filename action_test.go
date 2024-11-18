@@ -93,15 +93,15 @@ func TestSerf_Action_SameClock(t *testing.T) {
 	require.Nil(t, err)
 
 	msg := msgAction{
-		LTime: 1,
-		ID:    1,
-		Name:  "first",
+		LTime:   1,
+		Name:    "first",
+		Payload: []byte("small"),
 	}
 	require.True(t, s.action.addToBuffer(&msg), "should be added")
 
-	msg.ID = 2
+	msg.Payload = []byte("medium")
 	require.True(t, s.action.addToBuffer(&msg), "should be added")
 
-	msg.ID = 3
+	msg.Payload = []byte("large")
 	require.True(t, s.action.addToBuffer(&msg), "should be added")
 }

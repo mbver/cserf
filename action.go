@@ -2,14 +2,12 @@ package serf
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 )
 
 // cluster action msg
 type msgAction struct {
 	LTime   LamportTime
-	ID      uint32
 	Name    string
 	Payload []byte
 }
@@ -33,7 +31,6 @@ func (m *ActionManager) addToBuffer(msg *msgAction) (succcess bool) {
 	defer m.l.Unlock()
 	item := &lItem{
 		LTime:   msg.LTime,
-		ID:      msg.ID,
 		Payload: msg.Payload,
 	}
 	return m.buffers.addItem(m.clock.Time(), item)
@@ -82,7 +79,6 @@ func (s *Serf) Action(name string, payload []byte) error {
 	}
 	msg := &msgAction{
 		LTime:   s.action.clock.Time(), // witness will auto-increase it
-		ID:      rand.Uint32(),
 		Name:    name,
 		Payload: payload,
 	}
