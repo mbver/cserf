@@ -74,6 +74,9 @@ func (c *MemberEventCoalescer) coalesce() {
 				continue
 			}
 			mEvent := e.(*MemberEvent)
+			if mEvent.Member == nil {
+				continue
+			}
 			c.newEvents[mEvent.Member.ID] = mEvent
 		case <-flushTicker.C:
 			c.flush()

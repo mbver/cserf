@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	memberlist "github.com/mbver/mlist"
 	"github.com/stretchr/testify/require"
@@ -385,5 +387,52 @@ func TestSerf_ListKey_Truncated(t *testing.T) {
 			err = s2.keyring.RemoveKey(k)
 			require.Nil(t, err)
 		}
+	}
+}
+
+func TestKeyQueryReceptor_PassThrough(t *testing.T) {
+	s, cleanup, err := testNode(nil)
+	defer cleanup()
+	require.Nil(t, err)
+	time.Sleep(50 * time.Millisecond)
+	eventCh := make(chan Event, 10)
+	stream := StreamEventHandler{
+		eventCh: eventCh,
+	}
+	s.eventHandlers.stream.register(&stream)
+	s.inEventCh <- &QueryEvent{LTime: 10, Name: keyCommandToQueryName("install")}
+	s.inEventCh <- &QueryEvent{LTime: 11, Name: keyCommandToQueryName("use")}
+	s.inEventCh <- &QueryEvent{LTime: 12, Name: keyCommandToQueryName("remove")}
+
+	aEvent := &ActionEvent{LTime: 42, Name: "foo"}
+	s.inEventCh <- aEvent
+
+	qEvent := &QueryEvent{LTime: 42, Name: "foo"}
+	s.inEventCh <- qEvent
+
+	mEvent := &MemberEvent{
+		Type:   EventMemberJoin,
+		Member: &memberlist.Node{}}
+	s.inEventCh <- mEvent
+
+	enough, msg := retry(5, func() (bool, string) {
+		time.Sleep(20 * time.Millisecond)
+		if len(eventCh) != 3 {
+			return false, fmt.Sprintf("missing events: %d/3", len(eventCh))
+		}
+		return true, ""
+	})
+	require.True(t, enough, msg)
+
+	cEvent := &CoalescedMemberEvent{
+		Type:    mEvent.EventType(),
+		Members: []*memberlist.Node{mEvent.Member},
+	}
+	for _, event := range []Event{aEvent, qEvent, cEvent} {
+		e := <-eventCh
+		require.True(t,
+			reflect.DeepEqual(e, event),
+			fmt.Sprintf("got: %+v, expect: %+v", e, event),
+		)
 	}
 }

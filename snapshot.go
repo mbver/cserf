@@ -208,6 +208,9 @@ func (s *Snapshotter) recordMemberEvent(e *MemberEvent) {
 	switch e.Type {
 	case EventMemberJoin:
 		m := e.Member
+		if m == nil {
+			return
+		}
 		addr := net.TCPAddr{IP: m.IP, Port: int(m.Port)}
 		s.aliveNodes[m.ID] = addr.String()
 		s.tryAppend(fmt.Sprintf("alive: %s %s\n", m.ID, addr.String()))
