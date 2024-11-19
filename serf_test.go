@@ -110,14 +110,15 @@ func combineCleanup(cleanups ...func()) func() {
 }
 
 type testNodeOpts struct {
-	tags    map[string]string
-	ip      net.IP
-	port    int
-	snap    string
-	script  string
-	ping    PingDelegate
-	keyring *memberlist.Keyring
-	eventCh chan Event
+	tags      map[string]string
+	ip        net.IP
+	port      int
+	snap      string
+	script    string
+	ping      PingDelegate
+	keyring   *memberlist.Keyring
+	eventCh   chan Event
+	tombStone time.Duration
 }
 
 func tmpPath() string {
@@ -185,7 +186,9 @@ func testNode(opts *testNodeOpts) (*Serf, func(), error) {
 		ReconnectTimeout: 5 * time.Millisecond,
 		TombstoneTimeout: 5 * time.Millisecond,
 	} // fill in later
-
+	if opts.tombStone > 0 {
+		conf.TombstoneTimeout = opts.tombStone
+	}
 	cleanup1 := combineCleanup(cleanup, func() {
 		data, _ := os.ReadFile(conf.SnapshotPath)
 		logger.Printf("### snapshot %s:", string(data))
