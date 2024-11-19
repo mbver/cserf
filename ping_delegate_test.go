@@ -71,26 +71,21 @@ func TestPing_RougeCoordinates(t *testing.T) {
 	p, err := newPingDelegate(logger)
 	require.Nil(t, err)
 	rouge := rouguePingDelegate{p}
-	s1, cleanup1, err := testNode(&testNodeOpts{ping: &rouge})
-	defer cleanup1()
+
+	s1, s2, cleanup, err := twoNodesJoined(
+		&testNodeOpts{ping: &rouge},
+		nil,
+	)
+	defer cleanup()
 	require.Nil(t, err)
 
-	s2, cleanup2, err := testNode(nil)
-	defer cleanup2()
-	require.Nil(t, err)
-
-	addr, err := s2.AdvertiseAddress()
-	require.Nil(t, err)
-	n, err := s1.Join([]string{addr}, false)
-	require.Equal(t, 1, n)
-	require.Nil(t, err)
 	updated, msg := retry(5, func() (bool, string) {
 		time.Sleep(50 * time.Millisecond)
 		if s1.GetCachedCoord(s2.ID()) == nil {
 			return false, "s1 didn't get a coord for s2"
 		}
 		if s2.GetCachedCoord(s1.ID()) != nil {
-			return false, "s2 should not see rough node!"
+			return false, "s2 should not see rouge node!"
 		}
 		return true, ""
 	})

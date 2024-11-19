@@ -11,21 +11,14 @@ import (
 
 func TestUserState_LocalState(t *testing.T) {
 	eventCh := make(chan Event, 10)
-	s1, cleanup1, err := testNode(&testNodeOpts{
-		eventCh:   eventCh,
-		tombStone: time.Hour, // don't reap
-	})
-	defer cleanup1()
-	require.Nil(t, err)
-
-	s2, cleanup2, err := testNode(nil)
-	defer cleanup2()
-	require.Nil(t, err)
-
-	addr, err := s2.AdvertiseAddress()
-	require.Nil(t, err)
-	n, err := s1.Join([]string{addr}, false)
-	require.Equal(t, 1, n)
+	s1, s2, cleanup, err := twoNodesJoined(
+		&testNodeOpts{
+			eventCh:   eventCh,
+			tombStone: time.Hour,
+		},
+		nil,
+	)
+	defer cleanup()
 	require.Nil(t, err)
 
 	s1.Action("deploy", []byte("something"))

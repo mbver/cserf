@@ -15,7 +15,7 @@ import (
 )
 
 func TestSerf_SnapshotRecovery(t *testing.T) {
-	s1, s2, cleanup, err := twoNodesJoined()
+	s1, s2, cleanup, err := twoNodesJoined(nil, nil)
 	defer cleanup()
 	require.Nil(t, err)
 	err = s1.Action("first", []byte("first-test"))

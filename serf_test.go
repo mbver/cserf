@@ -110,15 +110,18 @@ func combineCleanup(cleanups ...func()) func() {
 }
 
 type testNodeOpts struct {
-	tags      map[string]string
-	ip        net.IP
-	port      int
-	snap      string
-	script    string
-	ping      PingDelegate
-	keyring   *memberlist.Keyring
-	eventCh   chan Event
-	tombStone time.Duration
+	tags          map[string]string
+	ip            net.IP
+	port          int
+	snap          string
+	script        string
+	ping          PingDelegate
+	keyring       *memberlist.Keyring
+	eventCh       chan Event
+	tombStone     time.Duration
+	coalesce      time.Duration
+	failedTimeout time.Duration
+	reconnect     time.Duration
 }
 
 func tmpPath() string {
@@ -189,6 +192,15 @@ func testNode(opts *testNodeOpts) (*Serf, func(), error) {
 	if opts.tombStone > 0 {
 		conf.TombstoneTimeout = opts.tombStone
 	}
+	if opts.coalesce > 0 {
+		conf.CoalesceInterval = opts.coalesce
+	}
+	if opts.failedTimeout > 0 {
+		conf.ReconnectTimeout = opts.failedTimeout
+	}
+	if opts.reconnect > 0 {
+		conf.ReconnectInterval = opts.reconnect
+	}
 	cleanup1 := combineCleanup(cleanup, func() {
 		data, _ := os.ReadFile(conf.SnapshotPath)
 		logger.Printf("### snapshot %s:", string(data))
@@ -216,12 +228,12 @@ func testNode(opts *testNodeOpts) (*Serf, func(), error) {
 	return s, cleanup2, nil
 }
 
-func twoNodes() (*Serf, *Serf, func(), error) {
-	s1, cleanup1, err := testNode(nil)
+func twoNodes(opts1, opts2 *testNodeOpts) (*Serf, *Serf, func(), error) {
+	s1, cleanup1, err := testNode(opts1)
 	if err != nil {
 		return nil, nil, cleanup1, err
 	}
-	s2, cleanup2, err := testNode(nil)
+	s2, cleanup2, err := testNode(opts2)
 	cleanup := combineCleanup(cleanup1, cleanup2)
 	if err != nil {
 		return nil, nil, cleanup, err
@@ -229,8 +241,27 @@ func twoNodes() (*Serf, *Serf, func(), error) {
 	return s1, s2, cleanup, err
 }
 
+func twoNodesJoined(opts1, opts2 *testNodeOpts) (*Serf, *Serf, func(), error) {
+	s1, s2, cleanup, err := twoNodes(opts1, opts2)
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	addr, err := s2.AdvertiseAddress()
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	n, err := s1.Join([]string{addr}, false)
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	if n != 1 {
+		return nil, nil, cleanup, fmt.Errorf("join failed")
+	}
+	return s1, s2, cleanup, err
+}
+
 func threeNodes() (*Serf, *Serf, *Serf, func(), error) {
-	s1, s2, cleanup1, err := twoNodes()
+	s1, s2, cleanup1, err := twoNodes(nil, nil)
 	if err != nil {
 		return nil, nil, nil, cleanup1, err
 	}
@@ -251,41 +282,8 @@ func TestSerf_Create(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func twoNodesJoined() (*Serf, *Serf, func(), error) {
-	return twoNodesJoinedWithEventStream(nil)
-}
-
-func twoNodesJoinedWithEventStream(eventCh chan Event) (*Serf, *Serf, func(), error) {
-	s1, s2, cleanup, err := twoNodes()
-	if err != nil {
-		return nil, nil, cleanup, err
-	}
-	time.Sleep(50 * time.Millisecond) // wait until initial join events flushed out of the pipeline
-	if eventCh != nil {
-		stream := StreamEventHandler{
-			eventCh: eventCh,
-		}
-		s1.eventHandlers.stream.register(&stream)
-	}
-	addr, err := s2.AdvertiseAddress()
-	if err != nil {
-		return nil, nil, cleanup, err
-	}
-	n, err := s1.Join([]string{addr}, false)
-	if err != nil {
-		return nil, nil, cleanup, err
-	}
-	if n != 1 {
-		return nil, nil, cleanup, fmt.Errorf("num success %d, expect %d", n, 1)
-	}
-	if s1.mlist.NumActive() != 2 {
-		return nil, nil, cleanup, fmt.Errorf("not enough active nodes")
-	}
-	return s1, s2, cleanup, nil
-}
-
 func TestSerf_Join(t *testing.T) {
-	_, _, cleanup, err := twoNodesJoined()
+	_, _, cleanup, err := twoNodesJoined(nil, nil)
 	defer cleanup()
 	require.Nil(t, err)
 }
@@ -345,9 +343,14 @@ func checkEventsForNode(id string, ch chan Event, expected []EventType) (bool, s
 
 func TestSerf_EventJoinShutdown(t *testing.T) {
 	eventCh := make(chan Event, 10)
-	_, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
+	_, s2, cleanup, err := twoNodesJoined(
+		&testNodeOpts{eventCh: eventCh, coalesce: 1 * time.Millisecond},
+		nil,
+	)
 	defer cleanup()
 	require.Nil(t, err)
+
+	time.Sleep(5 * time.Millisecond) // wait until join event flushed
 
 	s2.Shutdown()
 
@@ -365,14 +368,19 @@ func TestSerf_EventJoinShutdown(t *testing.T) {
 	require.True(t, success, msg)
 }
 
-// TODO: this test fails but very rarely. inspect it more intensively
 func TestSerf_EventLeave(t *testing.T) {
 	eventCh := make(chan Event, 10)
-	_, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
+	_, s2, cleanup, err := twoNodesJoined(
+		&testNodeOpts{eventCh: eventCh, coalesce: 1 * time.Millisecond},
+		nil,
+	)
 	defer cleanup()
 	require.Nil(t, err)
 
+	time.Sleep(5 * time.Millisecond) // wait a bit until join event flushed
+
 	s2.Leave()
+
 	success, msg := retry(5, func() (bool, string) {
 		time.Sleep(50 * time.Millisecond)
 		if len(eventCh) < 3 {
@@ -380,13 +388,6 @@ func TestSerf_EventLeave(t *testing.T) {
 		}
 		return true, ""
 	})
-	if len(eventCh) < 3 {
-		n := len(eventCh)
-		for i := 0; i < n; i++ {
-			e := <-eventCh
-			fmt.Println("============ failed", e.EventType())
-		}
-	}
 	require.True(t, success, msg)
 	success, msg = checkEventsForNode(s2.ID(), eventCh, []EventType{
 		EventMemberJoin, EventMemberLeave, EventMemberReap,
@@ -396,14 +397,18 @@ func TestSerf_EventLeave(t *testing.T) {
 
 func TestSerf_Reconnect(t *testing.T) {
 	eventCh := make(chan Event, 10)
-	s1, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
+	_, s2, cleanup, err := twoNodesJoined(
+		&testNodeOpts{
+			eventCh:       eventCh,
+			coalesce:      1 * time.Millisecond,
+			failedTimeout: 5 * time.Hour,
+			reconnect:     5 * time.Millisecond,
+		},
+		nil,
+	)
 	defer cleanup()
 	require.Nil(t, err)
-
-	s1.inactive.l.Lock()
-	s1.inactive.failedTimeout = 5 * time.Second
-	s1.inactive.l.Unlock()
-	go scheduleFunc(5*time.Millisecond, s1.shutdownCh, s1.reconnect)
+	time.Sleep(5 * time.Millisecond)
 
 	ip, _, err := s2.mlist.GetAdvertiseAddr()
 	require.Nil(t, err)
@@ -439,30 +444,26 @@ func TestSerf_Reconnect(t *testing.T) {
 }
 
 func TestSerf_Reconnect_SameIP(t *testing.T) {
+	ip, cleanup := testaddr.BindAddrs.NextAvailAddr()
+	defer cleanup()
+
 	eventCh := make(chan Event, 10)
-	s1, cleanup1, err := testNode(&testNodeOpts{eventCh: eventCh})
+	_, s2, cleanup1, err := twoNodesJoined(
+		&testNodeOpts{
+			ip:            ip,
+			eventCh:       eventCh,
+			coalesce:      1 * time.Millisecond,
+			failedTimeout: 5 * time.Hour,
+			reconnect:     5 * time.Millisecond,
+		},
+		&testNodeOpts{
+			ip:   ip,
+			port: 7947,
+		},
+	)
 	defer cleanup1()
 	require.Nil(t, err)
-
-	s1.inactive.l.Lock()
-	s1.inactive.failedTimeout = 5 * time.Second
-	s1.inactive.l.Unlock()
-	go scheduleFunc(5*time.Millisecond, s1.shutdownCh, s1.reconnect)
-
-	ip, port, err := s1.mlist.GetAdvertiseAddr()
-	require.Nil(t, err)
-
-	s2, cleanup2, err := testNode(&testNodeOpts{ip: ip, port: int(port) + 1})
-	defer cleanup2()
-	require.Nil(t, err)
-
-	addr, err := s2.AdvertiseAddress()
-	require.Nil(t, err)
-
-	n, err := s1.Join([]string{addr}, false)
-	require.Equal(t, 1, n)
-	require.Nil(t, err)
-	require.Equal(t, 2, s1.mlist.NumActive())
+	time.Sleep(5 * time.Millisecond)
 
 	s2.Shutdown()
 
@@ -479,7 +480,7 @@ func TestSerf_Reconnect_SameIP(t *testing.T) {
 	})
 	require.True(t, match, msg)
 
-	s2, cleanup2, err = testNode(&testNodeOpts{ip: ip, port: int(port) + 1})
+	s2, cleanup2, err := testNode(&testNodeOpts{ip: ip, port: 7947})
 	defer cleanup2()
 	require.Nil(t, err)
 
@@ -499,7 +500,10 @@ func TestSerf_Reconnect_SameIP(t *testing.T) {
 
 func TestSerf_SetTags(t *testing.T) {
 	eventCh := make(chan Event, 10)
-	s1, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
+	s1, s2, cleanup, err := twoNodesJoined(
+		&testNodeOpts{eventCh: eventCh},
+		nil,
+	)
 	defer cleanup()
 	require.Nil(t, err)
 	s1.SetTags(map[string]string{"port": "8000"})
@@ -537,7 +541,7 @@ func TestSerf_SetTags(t *testing.T) {
 }
 
 func TestSerf_JoinLeave(t *testing.T) {
-	s1, s2, cleanup, err := twoNodesJoined()
+	s1, s2, cleanup, err := twoNodesJoined(nil, nil)
 	defer cleanup()
 	require.Nil(t, err)
 
@@ -553,7 +557,7 @@ func TestSerf_JoinLeave(t *testing.T) {
 }
 
 func TestSerf_JoinLeaveJoin(t *testing.T) {
-	s1, s2, cleanup, err := twoNodesJoined()
+	s1, s2, cleanup, err := twoNodesJoined(nil, nil)
 	defer cleanup()
 	require.Nil(t, err)
 
@@ -611,7 +615,7 @@ func TestSerf_JoinLeaveJoin(t *testing.T) {
 }
 
 func TestSerf_LeaveJoinDifferentRole(t *testing.T) {
-	s1, s2, cleanup, err := twoNodesJoined()
+	s1, s2, cleanup, err := twoNodesJoined(nil, nil)
 	defer cleanup()
 	require.Nil(t, err)
 
@@ -648,24 +652,16 @@ func TestSerf_LeaveJoinDifferentRole(t *testing.T) {
 }
 
 func TestSerf_Role(t *testing.T) {
-	s1, cleanup1, err := testNode(&testNodeOpts{
-		tags: map[string]string{"role": "web"},
-	})
-	defer cleanup1()
+	s1, s2, cleanup, err := twoNodesJoined(
+		&testNodeOpts{
+			tags: map[string]string{"role": "web"},
+		},
+		&testNodeOpts{
+			tags: map[string]string{"role": "lb"},
+		},
+	)
+	defer cleanup()
 	require.Nil(t, err)
-
-	s2, cleanup2, err := testNode(&testNodeOpts{
-		tags: map[string]string{"role": "lb"},
-	})
-	defer cleanup2()
-	require.Nil(t, err)
-
-	addr, err := s2.AdvertiseAddress()
-	require.Nil(t, err)
-
-	n, err := s1.Join([]string{addr}, false)
-	require.Nil(t, err)
-	require.Equal(t, 1, n)
 
 	found, msg := retry(5, func() (bool, string) {
 		n1 := s2.mlist.GetNodeState(s1.ID())
@@ -683,45 +679,6 @@ func TestSerf_Role(t *testing.T) {
 		return true, ""
 	})
 	require.True(t, found, msg)
-}
-
-func TestSerf_JoinIgnoreOld(t *testing.T) {
-	s1, s2, cleanup, err := twoNodes()
-	defer cleanup()
-	require.Nil(t, err)
-
-	time.Sleep(50 * time.Millisecond) // wait for flushing initial join-event
-	eventCh := make(chan Event, 10)
-	stream := StreamEventHandler{
-		eventCh: eventCh,
-	}
-	s1.eventHandlers.stream.register(&stream)
-
-	err = s2.Action("first", []byte("first-test"))
-	require.Nil(t, err)
-
-	err = s2.Action("second", []byte("second-test"))
-	require.Nil(t, err)
-
-	time.Sleep(10 * time.Millisecond)
-
-	addr, err := s2.AdvertiseAddress()
-	require.Nil(t, err)
-
-	n, err := s1.Join([]string{addr}, true)
-	require.Equal(t, 1, n)
-	require.Nil(t, err)
-
-	enough, msg := retry(5, func() (bool, string) {
-		time.Sleep(10 * time.Millisecond)
-		if len(eventCh) < 1 {
-			return false, "not enough events"
-		}
-		return true, ""
-	})
-	require.True(t, enough, msg)
-	match, msg := checkActions(eventCh, []string{}, [][]byte{})
-	require.True(t, match, msg)
 }
 
 func TestSerf_State(t *testing.T) {

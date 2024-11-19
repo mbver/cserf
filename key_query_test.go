@@ -326,7 +326,7 @@ func genTestKeys(n int) []string {
 }
 
 func TestSerf_ListKey_Truncated(t *testing.T) {
-	s1, s2, cleanup, err := twoNodesJoined()
+	s1, s2, cleanup, err := twoNodesJoined(nil, nil)
 	defer cleanup()
 	require.Nil(t, err)
 

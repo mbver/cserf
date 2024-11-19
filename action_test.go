@@ -37,7 +37,10 @@ func checkActions(ch chan Event, names []string, payloads [][]byte) (bool, strin
 
 func TestSerf_Action(t *testing.T) {
 	eventCh := make(chan Event, 10)
-	_, s2, cleanup, err := twoNodesJoinedWithEventStream(eventCh)
+	_, s2, cleanup, err := twoNodesJoined(
+		&testNodeOpts{eventCh: eventCh},
+		nil,
+	)
 	defer cleanup()
 	require.Nil(t, err)
 
