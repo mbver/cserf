@@ -133,3 +133,40 @@ func TestUserState_Merge(t *testing.T) {
 	})
 	require.True(t, gotAction, errMsg)
 }
+
+func TestUserState_Merge_IgnoreOld(t *testing.T) {
+	eventCh := make(chan Event, 10)
+	s1, cleanup1, err := testNode(&testNodeOpts{eventCh: eventCh})
+	defer cleanup1()
+	require.Nil(t, err)
+
+	s2, cleanup2, err := testNode(nil)
+	defer cleanup2()
+	require.Nil(t, err)
+	s2.Action("first", []byte("small"))
+	s2.Action("second", []byte("medium"))
+	s2.Action("third", []byte("large"))
+
+	addr, err := s2.AdvertiseAddress()
+	require.Nil(t, err)
+
+	n, err := s1.Join([]string{addr}, true)
+	require.Nil(t, err)
+	require.Equal(t, 1, n)
+
+	require.Equal(t, s2.action.clock.Time(), s1.action.getActionMinTime())
+
+	noAction, errMsg := retry(5, func() (bool, string) {
+		time.Sleep(20 * time.Millisecond)
+		n := len(eventCh)
+		for i := 0; i < n; i++ {
+			e := <-eventCh
+			e, ok := e.(*ActionEvent)
+			if ok {
+				return false, "got action"
+			}
+		}
+		return true, ""
+	})
+	require.True(t, noAction, errMsg)
+}
