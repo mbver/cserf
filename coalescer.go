@@ -65,6 +65,8 @@ func (c *MemberEventCoalescer) flush() {
 func (c *MemberEventCoalescer) coalesce() {
 	flushTicker := time.NewTicker(c.flushInterval)
 	defer flushTicker.Stop()
+	cleanTicker := time.NewTicker(30 * time.Minute)
+	defer cleanTicker.Stop()
 	for {
 		select {
 		case e := <-c.inCh:
@@ -80,6 +82,8 @@ func (c *MemberEventCoalescer) coalesce() {
 			c.newEvents[mEvent.Member.ID] = mEvent
 		case <-flushTicker.C:
 			c.flush()
+		case <-cleanTicker.C:
+			c.oldEvents = make(map[string]*MemberEvent) // clean the old events
 		case <-c.shutdownCh:
 			c.flush()
 			c.logger.Printf("[WARN] serf member-event-coalescer: serf shutdown, quitting coalesce events")

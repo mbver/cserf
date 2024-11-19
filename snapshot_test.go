@@ -264,6 +264,7 @@ func TestSnapshotter_SlowDiskNotBlockingOutEventCh(t *testing.T) {
 				numRecvd++
 			case <-timeoutCh:
 				errCh <- fmt.Errorf("timeout")
+				return
 			}
 		}
 		errCh <- nil
