@@ -74,7 +74,8 @@ func TestSerf_Action_SizeLimit(t *testing.T) {
 }
 
 func TestSerf_Action_OldMsg(t *testing.T) {
-	s, cleanup, err := testNode(nil)
+	eventCh := make(chan Event, 10)
+	s, cleanup, err := testNode(&testNodeOpts{eventCh: eventCh})
 	defer cleanup()
 	require.Nil(t, err)
 
@@ -84,24 +85,50 @@ func TestSerf_Action_OldMsg(t *testing.T) {
 		Name:    "old",
 		Payload: nil,
 	}
-	require.False(t, s.action.addToBuffer(&msg))
+	encoded, err := encode(msgActionType, msg)
+	require.Nil(t, err)
+	require.Equal(t, byte(msgActionType), encoded[0])
+
+	s.handleAction(encoded)
+	time.Sleep(100 * time.Millisecond)
+	require.Zero(t, len(eventCh))
 }
 
 func TestSerf_Action_SameClock(t *testing.T) {
-	s, cleanup, err := testNode(nil)
+	eventCh := make(chan Event, 10)
+	s, cleanup, err := testNode(&testNodeOpts{eventCh: eventCh})
 	defer cleanup()
 	require.Nil(t, err)
 
-	msg := msgAction{
-		LTime:   1,
-		Name:    "first",
-		Payload: []byte("small"),
+	msgs := make([]msgAction, 3)
+	for i, payload := range []string{"small", "medium", "large"} {
+		msg := msgAction{
+			LTime:   1,
+			Name:    "first",
+			Payload: []byte(payload),
+		}
+		msgs[i] = msg
+		encoded, err := encode(msgActionType, msg)
+		require.Nil(t, err)
+		require.Equal(t, byte(msgActionType), encoded[0])
+
+		s.handleAction(encoded)
 	}
-	require.True(t, s.action.addToBuffer(&msg), "should be added")
+	enough, errMsg := retry(5, func() (bool, string) {
+		time.Sleep(20 * time.Millisecond)
+		if len(eventCh) != 3 {
+			return false, "not enough events"
+		}
+		return true, ""
+	})
+	require.True(t, enough, errMsg)
 
-	msg.Payload = []byte("medium")
-	require.True(t, s.action.addToBuffer(&msg), "should be added")
-
-	msg.Payload = []byte("large")
-	require.True(t, s.action.addToBuffer(&msg), "should be added")
+	for _, msg := range msgs {
+		e := <-eventCh
+		aEvent, ok := e.(*ActionEvent)
+		require.True(t, ok)
+		require.Equal(t, msg.LTime, aEvent.LTime)
+		require.Equal(t, msg.Name, aEvent.Name)
+		require.True(t, bytes.Equal(aEvent.Payload, msg.Payload))
+	}
 }

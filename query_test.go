@@ -1,6 +1,7 @@
 package serf
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -268,7 +269,8 @@ func TestSerf_EncodeDecodeRelay(t *testing.T) {
 }
 
 func TestSerf_Query_OldMsg(t *testing.T) {
-	s, cleanup, err := testNode(nil)
+	eventCh := make(chan Event, 10)
+	s, cleanup, err := testNode(&testNodeOpts{eventCh: eventCh})
 	defer cleanup()
 	require.Nil(t, err)
 
@@ -278,24 +280,48 @@ func TestSerf_Query_OldMsg(t *testing.T) {
 		Name:    "old",
 		Payload: nil,
 	}
-	require.False(t, s.query.addToBuffer(&msg))
+	encoded, err := encode(msgQueryType, msg)
+	require.Nil(t, err)
+	require.Equal(t, byte(msgQueryType), encoded[0])
+	s.handleQuery(encoded)
+	time.Sleep(100 * time.Millisecond)
+	require.Zero(t, len(eventCh))
 }
 
 func TestSerf_Query_SameClock(t *testing.T) {
-	s, cleanup, err := testNode(nil)
+	eventCh := make(chan Event, 10)
+	s, cleanup, err := testNode(&testNodeOpts{eventCh: eventCh})
 	defer cleanup()
 	require.Nil(t, err)
-
-	msg := msgQuery{
-		LTime: 1,
-		ID:    1,
-		Name:  "first",
+	msgs := make([]*msgQuery, 3)
+	for i := 1; i < 4; i++ {
+		msg := &msgQuery{
+			LTime:   1,
+			ID:      uint32(i),
+			Name:    "uptime",
+			Payload: []byte("something"),
+		}
+		msgs[i-1] = msg
+		encoded, err := encode(msgQueryType, msg)
+		require.Nil(t, err)
+		require.Equal(t, byte(msgQueryType), encoded[0])
+		s.handleQuery(encoded)
 	}
-	require.True(t, s.query.addToBuffer(&msg), "should be added")
-
-	msg.ID = 2
-	require.True(t, s.query.addToBuffer(&msg), "should be added")
-
-	msg.ID = 3
-	require.True(t, s.query.addToBuffer(&msg), "should be added")
+	enough, msg := retry(5, func() (bool, string) {
+		time.Sleep(20 * time.Millisecond)
+		if len(eventCh) != 3 {
+			return false, "not enough events"
+		}
+		return true, ""
+	})
+	require.True(t, enough, msg)
+	for _, msg := range msgs {
+		e := <-eventCh
+		qEvent, ok := e.(*QueryEvent)
+		require.True(t, ok)
+		require.Equal(t, msg.LTime, qEvent.LTime)
+		require.Equal(t, msg.ID, qEvent.ID)
+		require.Equal(t, msg.Name, qEvent.Name)
+		require.True(t, bytes.Equal(msg.Payload, qEvent.Payload))
+	}
 }

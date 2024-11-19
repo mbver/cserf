@@ -117,6 +117,7 @@ type testNodeOpts struct {
 	script  string
 	ping    PingDelegate
 	keyring *memberlist.Keyring
+	eventCh chan Event
 }
 
 func tmpPath() string {
@@ -202,6 +203,13 @@ func testNode(opts *testNodeOpts) (*Serf, func(), error) {
 		return nil, cleanup1, err
 	}
 	cleanup2 := combineCleanup(s.Shutdown, cleanup1)
+	if opts.eventCh != nil {
+		time.Sleep(50 * time.Millisecond) // wait for initial events flushed out
+		stream := StreamEventHandler{
+			eventCh: opts.eventCh,
+		}
+		s.eventHandlers.stream.register(&stream)
+	}
 	return s, cleanup2, nil
 }
 
@@ -249,7 +257,7 @@ func twoNodesJoinedWithEventStream(eventCh chan Event) (*Serf, *Serf, func(), er
 	if err != nil {
 		return nil, nil, cleanup, err
 	}
-	time.Sleep(10 * time.Millisecond) // wait until initial join events flushed out of the pipeline
+	time.Sleep(50 * time.Millisecond) // wait until initial join events flushed out of the pipeline
 	if eventCh != nil {
 		stream := StreamEventHandler{
 			eventCh: eventCh,
@@ -428,13 +436,10 @@ func TestSerf_Reconnect(t *testing.T) {
 }
 
 func TestSerf_Reconnect_SameIP(t *testing.T) {
-	s1, cleanup1, err := testNode(nil)
+	eventCh := make(chan Event, 10)
+	s1, cleanup1, err := testNode(&testNodeOpts{eventCh: eventCh})
 	defer cleanup1()
 	require.Nil(t, err)
-	stream := &StreamEventHandler{
-		eventCh: make(chan Event, 10),
-	}
-	s1.eventHandlers.stream.register(stream)
 
 	s1.inactive.l.Lock()
 	s1.inactive.failedTimeout = 5 * time.Second
@@ -460,13 +465,13 @@ func TestSerf_Reconnect_SameIP(t *testing.T) {
 
 	enough, msg := retry(5, func() (bool, string) {
 		time.Sleep(50 * time.Millisecond)
-		if len(stream.eventCh) < 2 {
+		if len(eventCh) < 2 {
 			return false, "not enough events"
 		}
 		return true, ""
 	})
 	require.True(t, enough, msg)
-	match, msg := checkEventsForNode(s2.ID(), stream.eventCh, []EventType{
+	match, msg := checkEventsForNode(s2.ID(), eventCh, []EventType{
 		EventMemberJoin, EventMemberFailed,
 	})
 	require.True(t, match, msg)
@@ -477,13 +482,13 @@ func TestSerf_Reconnect_SameIP(t *testing.T) {
 
 	enough, msg = retry(5, func() (bool, string) {
 		time.Sleep(10 * time.Millisecond)
-		if len(stream.eventCh) < 1 {
+		if len(eventCh) < 1 {
 			return false, "not enough events"
 		}
 		return true, ""
 	})
 	require.True(t, enough, msg)
-	match, msg = checkEventsForNode(s2.ID(), stream.eventCh, []EventType{
+	match, msg = checkEventsForNode(s2.ID(), eventCh, []EventType{
 		EventMemberJoin,
 	})
 	require.True(t, match, msg)
@@ -682,7 +687,7 @@ func TestSerf_JoinIgnoreOld(t *testing.T) {
 	defer cleanup()
 	require.Nil(t, err)
 
-	time.Sleep(10 * time.Millisecond) // wait for flushing initial join-event
+	time.Sleep(50 * time.Millisecond) // wait for flushing initial join-event
 	eventCh := make(chan Event, 10)
 	stream := StreamEventHandler{
 		eventCh: eventCh,

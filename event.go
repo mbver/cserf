@@ -43,7 +43,7 @@ func (t EventType) String() string {
 	case EventAction:
 		return "action"
 	}
-	return "unknown- event"
+	return "unknown-event"
 }
 
 type QueryEvent struct {
@@ -78,7 +78,7 @@ func (a *ActionEvent) EventType() EventType {
 }
 
 func (a *ActionEvent) String() string {
-	return fmt.Sprintf("action: %s", a.Name)
+	return fmt.Sprintf("action-event: %s", a.Name)
 }
 
 type MemberEvent struct {

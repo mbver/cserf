@@ -391,15 +391,10 @@ func TestSerf_ListKey_Truncated(t *testing.T) {
 }
 
 func TestKeyQueryReceptor_PassThrough(t *testing.T) {
-	s, cleanup, err := testNode(nil)
+	eventCh := make(chan Event, 10)
+	s, cleanup, err := testNode(&testNodeOpts{eventCh: eventCh})
 	defer cleanup()
 	require.Nil(t, err)
-	time.Sleep(50 * time.Millisecond)
-	eventCh := make(chan Event, 10)
-	stream := StreamEventHandler{
-		eventCh: eventCh,
-	}
-	s.eventHandlers.stream.register(&stream)
 	s.inEventCh <- &QueryEvent{LTime: 10, Name: keyCommandToQueryName("install")}
 	s.inEventCh <- &QueryEvent{LTime: 11, Name: keyCommandToQueryName("use")}
 	s.inEventCh <- &QueryEvent{LTime: 12, Name: keyCommandToQueryName("remove")}
