@@ -63,8 +63,14 @@ func TestCoalescer_Basic(t *testing.T) {
 	lEvent, ok := e.(*CoalescedMemberEvent)
 	require.True(t, ok)
 	require.Equal(t, 2, len(lEvent.Members))
-	require.Equal(t, "first", lEvent.Members[0].ID)
-	require.Equal(t, "second", lEvent.Members[1].ID)
+
+	found := make(map[string]bool)
+	for _, n := range lEvent.Members {
+		found[n.ID] = true
+	}
+	for _, id := range []string{"first", "second"} {
+		require.True(t, found[id])
+	}
 
 	e, ok = cEvents[EventMemberUpdate]
 	require.True(t, ok)

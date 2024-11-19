@@ -101,9 +101,10 @@ func (s *Serf) isQueryAccepted(q *msgQuery) bool {
 		}
 		return false
 	}
+
 	if len(q.FilterTags) != 0 {
 		for _, f := range q.FilterTags {
-			matched, err := regexp.MatchString(f.Expr, s.tags[f.Name])
+			matched, err := regexp.MatchString(f.Expr, s.getTag(f.Name))
 			if err != nil || !matched {
 				return false
 			}

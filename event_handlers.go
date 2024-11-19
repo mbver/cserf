@@ -209,14 +209,16 @@ func (s *Serf) setupScriptCmd(script string, output *circbuf.Buffer) *exec.Cmd {
 
 	cmd.Env = append(os.Environ(),
 		"SERF_SELF_ID="+s.ID(),
-		"SERF_SELF_ROLE="+s.tags["role"],
+		"SERF_SELF_ROLE="+s.getTag("role"),
 	)
 
 	// add serf_tag_X env
+	s.tagL.Lock()
 	for name, val := range s.tags {
 		tag_env := fmt.Sprintf("SERF_TAG_%s=%s", toValidShellName(name), val)
 		cmd.Env = append(cmd.Env, tag_env)
 	}
+	s.tagL.Unlock()
 	return cmd
 }
 
