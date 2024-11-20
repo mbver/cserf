@@ -25,6 +25,7 @@ type SerfClient interface {
 	Hello(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (*StringValue, error)
 	HelloStream(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error)
 	Query(ctx context.Context, in *QueryParam, opts ...grpc.CallOption) (Serf_QueryClient, error)
+	Key(ctx context.Context, in *KeyRequest, opts ...grpc.CallOption) (*KeyResponse, error)
 }
 
 type serfClient struct {
@@ -108,6 +109,15 @@ func (x *serfQueryClient) Recv() (*StringValue, error) {
 	return m, nil
 }
 
+func (c *serfClient) Key(ctx context.Context, in *KeyRequest, opts ...grpc.CallOption) (*KeyResponse, error) {
+	out := new(KeyResponse)
+	err := c.cc.Invoke(ctx, "/pb.Serf/key", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SerfServer is the server API for Serf service.
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
@@ -115,6 +125,7 @@ type SerfServer interface {
 	Hello(context.Context, *StringValue) (*StringValue, error)
 	HelloStream(*StringValue, Serf_HelloStreamServer) error
 	Query(*QueryParam, Serf_QueryServer) error
+	Key(context.Context, *KeyRequest) (*KeyResponse, error)
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -130,6 +141,9 @@ func (UnimplementedSerfServer) HelloStream(*StringValue, Serf_HelloStreamServer)
 }
 func (UnimplementedSerfServer) Query(*QueryParam, Serf_QueryServer) error {
 	return status.Errorf(codes.Unimplemented, "method Query not implemented")
+}
+func (UnimplementedSerfServer) Key(context.Context, *KeyRequest) (*KeyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Key not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
 
@@ -204,6 +218,24 @@ func (x *serfQueryServer) Send(m *StringValue) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _Serf_Key_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerfServer).Key(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Serf/key",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerfServer).Key(ctx, req.(*KeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Serf_ServiceDesc is the grpc.ServiceDesc for Serf service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -214,6 +246,10 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "hello",
 			Handler:    _Serf_Hello_Handler,
+		},
+		{
+			MethodName: "key",
+			Handler:    _Serf_Key_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

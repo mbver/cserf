@@ -78,3 +78,12 @@ func (c *Client) Query(params *pb.QueryParam) (string, error) {
 	}
 	return buf.String(), nil
 }
+
+func (c *Client) Key(command string, key string) (*pb.KeyResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return c.client.Key(ctx, &pb.KeyRequest{
+		Command: command,
+		Key:     key,
+	})
+}

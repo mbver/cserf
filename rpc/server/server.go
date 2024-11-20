@@ -82,3 +82,32 @@ func (s *Server) Query(params *pb.QueryParam, stream pb.Serf_QueryServer) error 
 	}
 	return nil
 }
+
+func toPbKeyResponse(r *serf.KeyQueryResponse) *pb.KeyResponse {
+	pR := &pb.KeyResponse{
+		NumNodes:        uint32(r.NumNode),
+		NumRes:          uint32(r.NumResp),
+		NumErr:          uint32(r.NumErr),
+		ErrFrom:         map[string]string{},
+		PrimaryKeyCount: map[string]uint32{},
+		KeyCount:        map[string]uint32{},
+	}
+	for k, v := range r.ErrFrom {
+		pR.ErrFrom[k] = v
+	}
+	for k, v := range r.PrimaryKeyCount {
+		pR.PrimaryKeyCount[k] = uint32(v)
+	}
+	for k, v := range r.KeyCount {
+		pR.KeyCount[k] = uint32(v)
+	}
+	return pR
+}
+
+func (s *Server) Key(ctx context.Context, req *pb.KeyRequest) (*pb.KeyResponse, error) {
+	resp, err := s.serf.KeyQuery(req.Command, req.Key)
+	if err != nil {
+		return nil, err
+	}
+	return toPbKeyResponse(resp), nil
+}

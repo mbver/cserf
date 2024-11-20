@@ -25,8 +25,23 @@ message FilterTag {
     string expr = 2;
 }
 
+message KeyRequest {
+    string command = 1;
+    string key = 2;
+}
+
+message KeyResponse {
+    uint32 num_nodes = 1;
+    uint32 num_res = 2;
+    uint32 num_err = 3;
+    map<string, string> err_from = 4;
+    map<string, uint32> primary_key_count = 5;
+    map<string, uint32> key_count = 6;
+}
+
 service Serf{
     rpc hello(StringValue) returns (StringValue);
     rpc helloStream(StringValue) returns (stream StringValue);
     rpc query(QueryParam) returns (stream StringValue);
+    rpc key(KeyRequest) returns (KeyResponse);
 }
