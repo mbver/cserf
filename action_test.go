@@ -12,21 +12,22 @@ import (
 
 func checkActions(ch chan Event, names []string, payloads [][]byte) (bool, string) {
 	n := len(ch)
-	aEvents := []*ActionEvent{}
+	m := make(map[string]*ActionEvent)
 	for i := 0; i < n; i++ {
 		e := <-ch
 		a, ok := e.(*ActionEvent)
 		if !ok {
 			continue
 		}
-		aEvents = append(aEvents, a)
+		m[a.Name] = a
 	}
-	if len(names) != len(aEvents) {
-		return false, fmt.Sprintf("mismatch number of events: expect %d, got %d", len(names), len(aEvents))
+	if len(m) != len(names) {
+		return false, fmt.Sprintf("mismatch number of events: expect %d, got %d", len(names), len(m))
 	}
-	for i, a := range aEvents {
-		if names[i] != a.Name {
-			return false, "mismatch name: " + a.Name
+	for i, name := range names {
+		a, ok := m[name]
+		if !ok {
+			return false, "not found " + name
 		}
 		if !bytes.Equal(payloads[i], a.Payload) {
 			return false, "mismatch payload: " + string(a.Payload)
@@ -47,7 +48,7 @@ func TestSerf_Action(t *testing.T) {
 	err = s2.Action("first", []byte("first-test"))
 	require.Nil(t, err)
 
-	err = s2.Action("second", []byte("second-test"))
+	err = s2.Action("second", []byte("second-test")) // this can get broadcasted before the first!
 	require.Nil(t, err)
 
 	enough, msg := retry(5, func() (bool, string) {
