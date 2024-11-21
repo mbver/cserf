@@ -68,18 +68,18 @@ func CombineCleanup(cleanups ...func()) func() {
 }
 
 type TestNodeOpts struct {
-	tags    map[string]string
-	ip      net.IP
-	port    int
-	snap    string
-	script  string
-	ping    serf.PingDelegate
-	keyring *memberlist.Keyring
+	Tags    map[string]string
+	IP      net.IP
+	Port    int
+	Snap    string
+	Script  string
+	Ping    serf.PingDelegate
+	Keyring *memberlist.Keyring
 	// eventCh       chan serf.Event
-	tombStone     time.Duration
-	coalesce      time.Duration
-	failedTimeout time.Duration
-	reconnect     time.Duration
+	TombStone     time.Duration
+	Coalesce      time.Duration
+	FailedTimeout time.Duration
+	Reconnect     time.Duration
 }
 
 func tmpPath() string {
@@ -94,7 +94,7 @@ func TestNode(opts *TestNodeOpts) (*serf.Serf, func(), error) {
 	b := &serf.SerfBuilder{}
 	cleanup := func() {}
 
-	keyring := opts.keyring
+	keyring := opts.Keyring
 	var err error
 	if keyring == nil {
 		key := []byte{79, 216, 231, 114, 9, 125, 153, 178, 238, 179, 230, 218, 77, 54, 187, 171, 185, 207, 73, 74, 215, 193, 176, 226, 217, 216, 91, 182, 168, 171, 223, 187}
@@ -105,13 +105,13 @@ func TestNode(opts *TestNodeOpts) (*serf.Serf, func(), error) {
 	}
 	b.WithKeyring(keyring)
 
-	ip := opts.ip
+	ip := opts.IP
 	if ip == nil {
 		ip, cleanup = testaddr.BindAddrs.NextAvailAddr()
 	}
 	mconf := testMemberlistConfig()
 	mconf.BindAddr = ip.String()
-	port := opts.port
+	port := opts.Port
 	if port != 0 {
 		mconf.BindPort = port
 	}
@@ -122,11 +122,11 @@ func TestNode(opts *TestNodeOpts) (*serf.Serf, func(), error) {
 	logger := log.New(os.Stderr, prefix, log.LstdFlags)
 	b.WithLogger(logger)
 
-	snapPath := opts.snap
+	snapPath := opts.Snap
 	if snapPath == "" {
 		snapPath = tmpPath()
 	}
-	script := opts.script
+	script := opts.Script
 	if script == "" {
 		var cleanup1, cleanup2 func()
 		script, cleanup1, err = createTestEventScript()
@@ -145,7 +145,7 @@ func TestNode(opts *TestNodeOpts) (*serf.Serf, func(), error) {
 		ActionSizeLimit:        512,
 		SnapshotPath:           snapPath,
 		SnapshotMinCompactSize: 128 * 1024,
-		SnapshotDrainTimeout:   10 * time.Millisecond,
+		SnapshotDrainTimeout:   500 * time.Millisecond,
 		CoalesceInterval:       5 * time.Millisecond,
 		ReapInterval:           10 * time.Millisecond,
 		// ReconnectInterval:      1 * time.Millisecond,
@@ -153,17 +153,17 @@ func TestNode(opts *TestNodeOpts) (*serf.Serf, func(), error) {
 		ReconnectTimeout: 5 * time.Millisecond,
 		TombstoneTimeout: 5 * time.Millisecond,
 	} // fill in later
-	if opts.tombStone > 0 {
-		conf.TombstoneTimeout = opts.tombStone
+	if opts.TombStone > 0 {
+		conf.TombstoneTimeout = opts.TombStone
 	}
-	if opts.coalesce > 0 {
-		conf.CoalesceInterval = opts.coalesce
+	if opts.Coalesce > 0 {
+		conf.CoalesceInterval = opts.Coalesce
 	}
-	if opts.failedTimeout > 0 {
-		conf.ReconnectTimeout = opts.failedTimeout
+	if opts.FailedTimeout > 0 {
+		conf.ReconnectTimeout = opts.FailedTimeout
 	}
-	if opts.reconnect > 0 {
-		conf.ReconnectInterval = opts.reconnect
+	if opts.Reconnect > 0 {
+		conf.ReconnectInterval = opts.Reconnect
 	}
 	cleanup1 := CombineCleanup(cleanup, func() {
 		data, _ := os.ReadFile(conf.SnapshotPath)
@@ -173,9 +173,9 @@ func TestNode(opts *TestNodeOpts) (*serf.Serf, func(), error) {
 
 	b.WithConfig(conf)
 
-	b.WithTags(opts.tags)
+	b.WithTags(opts.Tags)
 
-	b.WithPingDelegate(opts.ping)
+	b.WithPingDelegate(opts.Ping)
 
 	s, err := b.Build()
 	if err != nil {
@@ -376,6 +376,36 @@ func PrepareRPCClient(addr string, cert string) (*client.Client, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+func CreateTestServer(opts *TestNodeOpts, addr string) (func(), error) {
+	cert, key, cleanup, err := GenerateSelfSignedCert()
+	if err != nil {
+		return cleanup, err
+	}
+	fmt.Println("====== cert path", cert)
+	serverCert, err := tls.LoadX509KeyPair(cert, key)
+	if err != nil {
+		return cleanup, err
+	}
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+	})
+	s, cleanup1, err := TestNode(opts)
+	cleanup2 := CombineCleanup(cleanup1, cleanup)
+	if err != nil {
+		return cleanup2, err
+	}
+	server, err := server.CreateServer(addr, creds, s)
+	if err != nil {
+		return cleanup2, err
+	}
+	cleanup3 := CombineCleanup(server.Stop, cleanup2)
+	return cleanup3, nil
+}
+
+func CreateTestClient(addr string, certPath string) (*client.Client, error) {
+	return PrepareRPCClient(addr, certPath)
 }
 
 func ClientServerRPC(opts *TestNodeOpts) (*client.Client, *grpc.Server, func(), error) {

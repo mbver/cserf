@@ -1,34 +1,44 @@
 package main
 
 import (
-	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/mbver/cserf/cmd/output"
 	"github.com/mbver/cserf/testutils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-var logger = log.New(os.Stderr, "grpc-server:", log.LstdFlags)
+const FlagRpcAddr = "rpc-addr"
+
+var out = output.DefaultOutput()
 
 func main() {
-	rootCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "start a grpc server",
 		Run: func(cmd *cobra.Command, args []string) {
-			client, _, cleanup, err := testutils.ClientServerRPC(nil)
+			vp := viper.New()
+			vp.BindPFlags(cmd.Flags())
+			addr := vp.GetString(FlagRpcAddr)
+			cleanup, err := testutils.CreateTestServer(nil, addr)
 			defer cleanup()
 			if err != nil {
-				logger.Printf("error: %v", err)
+				out.Error(err)
 				return
 			}
-			logger.Println("======= started serf")
-			res, err := client.Hello("alex")
-			if err != nil {
-				logger.Printf("error: %v", err)
-				return
-			}
-			logger.Printf("====== resp from server: %v", res)
+			out.Infof("running server at %s", addr)
+			waitForTerm()
 		},
 	}
-	rootCmd.Execute()
+	cmd.Flags().StringP(FlagRpcAddr, "r", "0.0.0.0:50051", "address that grpc-server listens on")
+	cmd.Execute()
+}
+
+func waitForTerm() {
+	sigCh := make(chan os.Signal, 4)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	<-sigCh
 }
