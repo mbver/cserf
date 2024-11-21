@@ -39,9 +39,15 @@ message KeyResponse {
     map<string, uint32> key_count = 6;
 }
 
+message ActionRequest {
+    string name = 1;
+    bytes payload = 2;
+}
+
 service Serf{
     rpc hello(StringValue) returns (StringValue);
     rpc helloStream(StringValue) returns (stream StringValue);
     rpc query(QueryParam) returns (stream StringValue);
     rpc key(KeyRequest) returns (KeyResponse);
+    rpc action(ActionRequest) returns (Empty);
 }

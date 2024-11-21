@@ -111,3 +111,11 @@ func (s *Server) Key(ctx context.Context, req *pb.KeyRequest) (*pb.KeyResponse, 
 	}
 	return toPbKeyResponse(resp), nil
 }
+
+func (s *Server) Action(ctx context.Context, req *pb.ActionRequest) (*pb.Empty, error) {
+	err := s.serf.Action(req.Name, req.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return nil, err
+}

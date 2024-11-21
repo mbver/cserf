@@ -87,3 +87,12 @@ func (c *Client) Key(command string, key string) (*pb.KeyResponse, error) {
 		Key:     key,
 	})
 }
+
+func (c *Client) Action(name string, payload []byte) (*pb.Empty, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return c.client.Action(ctx, &pb.ActionRequest{
+		Name:    name,
+		Payload: payload,
+	})
+}

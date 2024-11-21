@@ -41,6 +41,9 @@ func main() {
 	}
 	cmd.PersistentFlags().StringP(FlagRpcAddr, "r", "0.0.0.0:50051", "address of grpc server to connect")
 	cmd.PersistentFlags().StringP(FlagCertPath, "c", "./cert", "path to x059 certificate file")
+
 	cmd.AddCommand(KeyCommand())
+	cmd.AddCommand(ActionCommand())
+
 	cmd.Execute()
 }

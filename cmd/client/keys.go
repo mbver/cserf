@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var ErrAtLeastOneArg = fmt.Errorf("require at least 1 argument")
+
 func isValidKeyCommand(s string) bool {
 	return s == "install" || s == "use" || s == "remove" || s == "list"
 }
@@ -17,6 +19,7 @@ func KeyCommand() *cobra.Command {
 		Long:  keyHelp,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
+				out.Error(ErrAtLeastOneArg)
 				return
 			}
 			command := args[0]
@@ -27,7 +30,7 @@ func KeyCommand() *cobra.Command {
 			key := ""
 			if command != "list" {
 				if len(args) < 2 {
-					// logger.Printf("expect key for command: %q", command)
+					out.Error(fmt.Errorf("expect key for command: %s", command))
 					return
 				}
 				key = args[1]

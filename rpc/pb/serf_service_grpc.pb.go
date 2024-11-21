@@ -26,6 +26,7 @@ type SerfClient interface {
 	HelloStream(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error)
 	Query(ctx context.Context, in *QueryParam, opts ...grpc.CallOption) (Serf_QueryClient, error)
 	Key(ctx context.Context, in *KeyRequest, opts ...grpc.CallOption) (*KeyResponse, error)
+	Action(ctx context.Context, in *ActionRequest, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type serfClient struct {
@@ -118,6 +119,15 @@ func (c *serfClient) Key(ctx context.Context, in *KeyRequest, opts ...grpc.CallO
 	return out, nil
 }
 
+func (c *serfClient) Action(ctx context.Context, in *ActionRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/pb.Serf/action", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SerfServer is the server API for Serf service.
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
@@ -126,6 +136,7 @@ type SerfServer interface {
 	HelloStream(*StringValue, Serf_HelloStreamServer) error
 	Query(*QueryParam, Serf_QueryServer) error
 	Key(context.Context, *KeyRequest) (*KeyResponse, error)
+	Action(context.Context, *ActionRequest) (*Empty, error)
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -144,6 +155,9 @@ func (UnimplementedSerfServer) Query(*QueryParam, Serf_QueryServer) error {
 }
 func (UnimplementedSerfServer) Key(context.Context, *KeyRequest) (*KeyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Key not implemented")
+}
+func (UnimplementedSerfServer) Action(context.Context, *ActionRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Action not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
 
@@ -236,6 +250,24 @@ func _Serf_Key_Handler(srv interface{}, ctx context.Context, dec func(interface{
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Serf_Action_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ActionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerfServer).Action(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Serf/action",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerfServer).Action(ctx, req.(*ActionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Serf_ServiceDesc is the grpc.ServiceDesc for Serf service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -250,6 +282,10 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "key",
 			Handler:    _Serf_Key_Handler,
+		},
+		{
+			MethodName: "action",
+			Handler:    _Serf_Action_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

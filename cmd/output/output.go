@@ -33,6 +33,10 @@ func DefaultOutput() *Output {
 }
 
 func (o *Output) Result(name string, obj interface{}) {
+	if obj == nil {
+		fmt.Fprintf(o.output, "%s%s\n", o.resultPrefix, name)
+		return
+	}
 	jbytes, err := json.MarshalIndent(obj, "", " ")
 	if err != nil {
 		o.Error(err)
