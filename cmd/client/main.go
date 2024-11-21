@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	FlagRpcAddr  = "rpc-addr"
+	FlagRpcAddr  = "rpc"
 	FlagCertPath = "cert"
 )
 
@@ -39,11 +39,12 @@ func main() {
 			}
 		},
 	}
-	cmd.PersistentFlags().StringP(FlagRpcAddr, "r", "0.0.0.0:50051", "address of grpc server to connect")
-	cmd.PersistentFlags().StringP(FlagCertPath, "c", "./cert", "path to x059 certificate file")
+	cmd.PersistentFlags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
+	cmd.PersistentFlags().String(FlagCertPath, "./cert", "path to x059 certificate file")
 
 	cmd.AddCommand(KeyCommand())
 	cmd.AddCommand(ActionCommand())
+	cmd.AddCommand(QueryCommand())
 
 	cmd.Execute()
 }

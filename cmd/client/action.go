@@ -8,7 +8,6 @@ func ActionCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "action <name> <payload>",
 		Short: "dispatch a cluster action",
-		Long:  actionHelp,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				out.Error(ErrAtLeastOneArg)
@@ -28,6 +27,3 @@ func ActionCommand() *cobra.Command {
 		},
 	}
 }
-
-const actionHelp string = `
-`
