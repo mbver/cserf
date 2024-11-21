@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/mbver/cserf/cmd/output"
+	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/client"
 	"github.com/mbver/cserf/testutils"
 	"github.com/spf13/cobra"
@@ -13,7 +13,7 @@ const (
 	FlagCertPath = "cert"
 )
 
-var out = output.DefaultOutput()
+var out = utils.DefaultOutput()
 var gClient *client.Client
 
 func main() {
@@ -45,6 +45,8 @@ func main() {
 	cmd.AddCommand(KeyCommand())
 	cmd.AddCommand(ActionCommand())
 	cmd.AddCommand(QueryCommand())
+	cmd.AddCommand(ActiveCommand())
+	cmd.AddCommand(ReachCommand())
 
 	cmd.Execute()
 }

@@ -308,8 +308,45 @@ func (s *Serf) NumNodes() int {
 	return s.mlist.GetNumNodes()
 }
 
-func (s *Serf) Members() []*memberlist.Node {
-	return s.mlist.Members()
+type Member struct {
+	ID    string
+	Addr  string
+	Tags  string
+	State string
+	Lives int
+}
+
+func (s *Serf) Members() []*Member {
+	nodes := s.mlist.Members()
+	members := make([]*Member, 0, len(nodes))
+	for _, n := range nodes {
+		members = append(members, &Member{
+			ID:    n.Node.ID,
+			Addr:  n.Node.UDPAddress().String(),
+			State: n.State.String(),
+			Lives: int(n.Lives),
+		})
+	}
+	return members
+}
+
+func (s *Serf) ActiveNodes() []*Member {
+	nodes := s.mlist.ActiveNodes()
+	members := make([]*Member, 0, len(nodes))
+	for _, n := range nodes {
+		members = append(members, &Member{
+			ID:    n.Node.ID,
+			Addr:  n.Node.UDPAddress().String(),
+			Tags:  string(n.Node.Tags),
+			State: n.State.String(),
+			Lives: int(n.Lives),
+		})
+	}
+	return members
+}
+
+func (s *Serf) NumActive() int {
+	return s.mlist.NumActive()
 }
 
 func (s *Serf) LocalMember() *memberlist.Node {

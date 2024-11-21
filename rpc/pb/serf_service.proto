@@ -44,10 +44,30 @@ message ActionRequest {
     bytes payload = 2;
 }
 
+message ReachResponse {
+    uint32 num_node = 1;
+    uint32 num_res = 2;
+    repeated string acked = 3;
+}
+
+message Member {
+    string id = 1;
+    string addr = 2;
+    string tags = 3;
+    string state = 4;
+    uint32 lives = 5;
+}
+
+message MembersResponse {
+    repeated Member members = 1;
+}
+
 service Serf{
     rpc hello(StringValue) returns (StringValue);
     rpc helloStream(StringValue) returns (stream StringValue);
     rpc query(QueryParam) returns (stream StringValue);
     rpc key(KeyRequest) returns (KeyResponse);
     rpc action(ActionRequest) returns (Empty);
+    rpc reach(Empty) returns (ReachResponse);
+    rpc active(Empty) returns (MembersResponse);
 }

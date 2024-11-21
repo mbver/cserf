@@ -1,9 +1,9 @@
 package main
 
 import (
-	"strings"
 	"time"
 
+	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/pb"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -58,14 +58,11 @@ func toQueryParams(
 	relay int,
 	payload string,
 ) *pb.QueryParam {
-	nodes := []string{}
-	if len(nodeStr) != 0 {
-		nodes = strings.Split(nodeStr, ",")
-	}
+
 	tags := toFilterTags(tagStr)
 	return &pb.QueryParam{
 		Name:       name,
-		ForNodes:   nodes,
+		ForNodes:   utils.ToNodes(nodeStr),
 		FilterTags: tags,
 		NumRelays:  uint32(relay),
 		Timeout:    durationpb.New(timeout),
@@ -74,15 +71,7 @@ func toQueryParams(
 }
 
 func toFilterTags(s string) []*pb.FilterTag {
-	m := map[string]string{}
-	kvs := strings.Split(s, ",")
-	for _, kv := range kvs {
-		pair := strings.Split(kv, "=")
-		if len(pair) < 2 {
-			continue
-		}
-		m[pair[0]] = pair[1]
-	}
+	m := utils.ToTagMap(s)
 	if len(m) == 0 {
 		return nil
 	}

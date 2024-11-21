@@ -96,3 +96,15 @@ func (c *Client) Action(name string, payload []byte) (*pb.Empty, error) {
 		Payload: payload,
 	})
 }
+
+func (c *Client) Reach() (*pb.ReachResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return c.client.Reach(ctx, &pb.Empty{})
+}
+
+func (c *Client) Active() (*pb.MembersResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return c.client.Active(ctx, &pb.Empty{})
+}

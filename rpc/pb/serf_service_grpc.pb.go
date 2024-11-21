@@ -27,6 +27,8 @@ type SerfClient interface {
 	Query(ctx context.Context, in *QueryParam, opts ...grpc.CallOption) (Serf_QueryClient, error)
 	Key(ctx context.Context, in *KeyRequest, opts ...grpc.CallOption) (*KeyResponse, error)
 	Action(ctx context.Context, in *ActionRequest, opts ...grpc.CallOption) (*Empty, error)
+	Reach(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ReachResponse, error)
+	Active(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MembersResponse, error)
 }
 
 type serfClient struct {
@@ -128,6 +130,24 @@ func (c *serfClient) Action(ctx context.Context, in *ActionRequest, opts ...grpc
 	return out, nil
 }
 
+func (c *serfClient) Reach(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ReachResponse, error) {
+	out := new(ReachResponse)
+	err := c.cc.Invoke(ctx, "/pb.Serf/reach", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serfClient) Active(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MembersResponse, error) {
+	out := new(MembersResponse)
+	err := c.cc.Invoke(ctx, "/pb.Serf/active", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SerfServer is the server API for Serf service.
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
@@ -137,6 +157,8 @@ type SerfServer interface {
 	Query(*QueryParam, Serf_QueryServer) error
 	Key(context.Context, *KeyRequest) (*KeyResponse, error)
 	Action(context.Context, *ActionRequest) (*Empty, error)
+	Reach(context.Context, *Empty) (*ReachResponse, error)
+	Active(context.Context, *Empty) (*MembersResponse, error)
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -158,6 +180,12 @@ func (UnimplementedSerfServer) Key(context.Context, *KeyRequest) (*KeyResponse, 
 }
 func (UnimplementedSerfServer) Action(context.Context, *ActionRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Action not implemented")
+}
+func (UnimplementedSerfServer) Reach(context.Context, *Empty) (*ReachResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Reach not implemented")
+}
+func (UnimplementedSerfServer) Active(context.Context, *Empty) (*MembersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Active not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
 
@@ -268,6 +296,42 @@ func _Serf_Action_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Serf_Reach_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerfServer).Reach(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Serf/reach",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerfServer).Reach(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Serf_Active_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerfServer).Active(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Serf/active",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerfServer).Active(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Serf_ServiceDesc is the grpc.ServiceDesc for Serf service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -286,6 +350,14 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "action",
 			Handler:    _Serf_Action_Handler,
+		},
+		{
+			MethodName: "reach",
+			Handler:    _Serf_Reach_Handler,
+		},
+		{
+			MethodName: "active",
+			Handler:    _Serf_Active_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -256,7 +256,7 @@ func (s *Serf) pickRelayNodes(numNodes int, destID string) []*memberlist.Node {
 PICKNODE:
 	for i := 0; i < 3*l && len(picked) < numNodes; i++ {
 		idx := randIntN(l)
-		node := nodes[idx]
+		node := nodes[idx].Node
 		if node.ID == s.ID() || node.ID == destID {
 			continue
 		}
@@ -268,4 +268,38 @@ PICKNODE:
 		picked = append(picked, node)
 	}
 	return picked
+}
+
+const ReachQueryName = "reach"
+
+type ReachResponse struct {
+	NumNode int
+	NumResp int
+	Acked   []string
+}
+
+func (s *Serf) ReachQuery() (*ReachResponse, error) {
+	numActive := s.mlist.NumActive()
+	rRes := &ReachResponse{
+		NumNode: numActive,
+		Acked:   make([]string, 0, numActive),
+	}
+	params := s.DefaultQueryParams()
+	params.Name = ReachQueryName
+	respCh := make(chan *QueryResponse)
+	if err := s.Query(respCh, params); err != nil {
+		return nil, err
+	}
+	collectReachResponse(rRes, respCh)
+	return rRes, nil
+}
+
+func collectReachResponse(rR *ReachResponse, ch chan *QueryResponse) {
+	for r := range ch {
+		if rR.NumResp == rR.NumNode {
+			return
+		}
+		rR.NumResp++
+		rR.Acked = append(rR.Acked, r.From)
+	}
 }

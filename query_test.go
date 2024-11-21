@@ -325,3 +325,25 @@ func TestSerf_Query_SameClock(t *testing.T) {
 		require.True(t, bytes.Equal(msg.Payload, qEvent.Payload))
 	}
 }
+
+func TestSerf_ReachQuery(t *testing.T) {
+	s1, s2, s3, cleanup, err := threeNodesJoined()
+	defer cleanup()
+	require.Nil(t, err)
+
+	res, err := s1.ReachQuery()
+	require.Nil(t, err)
+	require.Equal(t, 3, res.NumNode)
+	require.Equal(t, 3, res.NumResp)
+	found := make([]bool, 3)
+	for i, id := range []string{s1.ID(), s2.ID(), s3.ID()} {
+		for _, id1 := range res.Acked {
+			if id1 == id {
+				found[i] = true
+			}
+		}
+	}
+	for i, v := range found {
+		require.True(t, v, fmt.Sprintf("missing: %d", i))
+	}
+}

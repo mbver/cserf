@@ -119,3 +119,32 @@ func (s *Server) Action(ctx context.Context, req *pb.ActionRequest) (*pb.Empty, 
 	}
 	return nil, err
 }
+
+func (s *Server) Reach(ctx context.Context, req *pb.Empty) (*pb.ReachResponse, error) {
+	res, err := s.serf.ReachQuery()
+	if err != nil {
+		return nil, err
+	}
+	return &pb.ReachResponse{
+		NumNode: uint32(res.NumNode),
+		NumRes:  uint32(res.NumResp),
+		Acked:   res.Acked,
+	}, nil
+}
+
+func (s *Server) Active(ctx context.Context, req *pb.Empty) (*pb.MembersResponse, error) {
+	nodes := s.serf.ActiveNodes()
+	res := &pb.MembersResponse{
+		Members: make([]*pb.Member, len(nodes)),
+	}
+	for i, n := range nodes {
+		res.Members[i] = &pb.Member{
+			Id:    n.ID,
+			Addr:  n.Addr,
+			Tags:  n.Tags,
+			State: n.State,
+			Lives: uint32(n.Lives),
+		}
+	}
+	return res, nil
+}

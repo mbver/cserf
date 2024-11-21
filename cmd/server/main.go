@@ -1,11 +1,7 @@
 package main
 
 import (
-	"os"
-	"os/signal"
-	"syscall"
-
-	"github.com/mbver/cserf/cmd/output"
+	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/testutils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -13,7 +9,7 @@ import (
 
 const FlagRpcAddr = "rpc-addr"
 
-var out = output.DefaultOutput()
+var out = utils.DefaultOutput()
 
 func main() {
 	cmd := &cobra.Command{
@@ -30,15 +26,9 @@ func main() {
 				return
 			}
 			out.Infof("running server at %s", addr)
-			waitForTerm()
+			utils.WaitForTerm()
 		},
 	}
 	cmd.Flags().StringP(FlagRpcAddr, "r", "0.0.0.0:50051", "address that grpc-server listens on")
 	cmd.Execute()
-}
-
-func waitForTerm() {
-	sigCh := make(chan os.Signal, 4)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-	<-sigCh
 }

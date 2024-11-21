@@ -79,7 +79,7 @@ func (s *Serf) handleQuery(msg []byte) {
 		return
 	}
 
-	s.inEventCh <- &QueryEvent{
+	qEvent := &QueryEvent{
 		Name:       q.Name,
 		LTime:      q.LTime,
 		ID:         q.ID,
@@ -90,6 +90,15 @@ func (s *Serf) handleQuery(msg []byte) {
 		Payload:    q.Payload,
 		Deadline:   time.Now().Add(q.Timeout),
 	}
+
+	if q.Name == ReachQueryName {
+		err := s.respondToQueryEvent(qEvent, nil)
+		if err != nil {
+			s.logger.Printf("[ERR] serf: failed to respond to reach command: %v", err)
+		}
+		return
+	}
+	s.inEventCh <- qEvent
 }
 
 func (s *Serf) isQueryAccepted(q *msgQuery) bool {
