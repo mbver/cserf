@@ -20,6 +20,9 @@ func main() {
 	cmd := cobra.Command{
 		Use: "serf",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if cmd.Name() == "keygen" {
+				return
+			}
 			vp := viper.New()
 			vp.BindPFlags(cmd.Flags())
 			addr := vp.GetString(FlagRpcAddr)
@@ -33,8 +36,8 @@ func main() {
 			}
 		},
 		PersistentPostRun: func(cmd *cobra.Command, args []string) {
-			out.Info("closing client ...")
 			if gClient != nil {
+				out.Info("closing client ...")
 				gClient.Close()
 			}
 		},
@@ -53,6 +56,6 @@ func main() {
 	cmd.AddCommand(RttCommand())
 	cmd.AddCommand(TagsCommand())
 	cmd.AddCommand(InfoCommand())
-
+	cmd.AddCommand(KeyGenCommand())
 	cmd.Execute()
 }
