@@ -245,12 +245,12 @@ func (s *Serf) Join(existing []string, ignoreOld bool) (int, error) {
 		s.usrState.setIgnoreActOnJoin(addr, ignoreOld)
 	}
 	defer func() { // unset in case join fails
-		for _, addr := range existing {
+		for _, addr := range res {
 			s.usrState.unsetJoin(addr)
 			s.usrState.unsetIgnoreActJoin(addr)
 		}
 	}()
-	return s.mlist.Join(existing)
+	return s.mlist.Join(res)
 }
 
 // try to join 1 previously known-node
