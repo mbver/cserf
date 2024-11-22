@@ -137,3 +137,9 @@ func (c *Client) Rtt(req *pb.RttRequest) (*durationpb.Duration, error) {
 	defer cancel()
 	return c.client.Rtt(ctx, req)
 }
+
+func (c *Client) Tag(req *pb.TagRequest) (*pb.Empty, error) {
+	ctx, cancel := defaultCtx()
+	defer cancel()
+	return c.client.Tag(ctx, req)
+}

@@ -51,6 +51,7 @@ func main() {
 	cmd.AddCommand(JoinCommand())
 	cmd.AddCommand(LeaveCommand())
 	cmd.AddCommand(RttCommand())
+	cmd.AddCommand(TagsCommand())
 
 	cmd.Execute()
 }

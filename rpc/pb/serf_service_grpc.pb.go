@@ -34,6 +34,7 @@ type SerfClient interface {
 	Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*IntValue, error)
 	Leave(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	Rtt(ctx context.Context, in *RttRequest, opts ...grpc.CallOption) (*durationpb.Duration, error)
+	Tag(ctx context.Context, in *TagRequest, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type serfClient struct {
@@ -189,6 +190,15 @@ func (c *serfClient) Rtt(ctx context.Context, in *RttRequest, opts ...grpc.CallO
 	return out, nil
 }
 
+func (c *serfClient) Tag(ctx context.Context, in *TagRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/pb.Serf/tag", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SerfServer is the server API for Serf service.
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
@@ -204,6 +214,7 @@ type SerfServer interface {
 	Join(context.Context, *JoinRequest) (*IntValue, error)
 	Leave(context.Context, *Empty) (*Empty, error)
 	Rtt(context.Context, *RttRequest) (*durationpb.Duration, error)
+	Tag(context.Context, *TagRequest) (*Empty, error)
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -243,6 +254,9 @@ func (UnimplementedSerfServer) Leave(context.Context, *Empty) (*Empty, error) {
 }
 func (UnimplementedSerfServer) Rtt(context.Context, *RttRequest) (*durationpb.Duration, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Rtt not implemented")
+}
+func (UnimplementedSerfServer) Tag(context.Context, *TagRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Tag not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
 
@@ -461,6 +475,24 @@ func _Serf_Rtt_Handler(srv interface{}, ctx context.Context, dec func(interface{
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Serf_Tag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerfServer).Tag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Serf/tag",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerfServer).Tag(ctx, req.(*TagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Serf_ServiceDesc is the grpc.ServiceDesc for Serf service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -503,6 +535,10 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "rtt",
 			Handler:    _Serf_Rtt_Handler,
+		},
+		{
+			MethodName: "tag",
+			Handler:    _Serf_Tag_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

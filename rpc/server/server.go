@@ -194,3 +194,20 @@ func (s *Server) Rtt(ctx context.Context, req *pb.RttRequest) (*durationpb.Durat
 	rtt := first.DistanceTo(second)
 	return durationpb.New(rtt), nil
 }
+
+const (
+	tagUpdateCommand = "update"
+	tagUnsetCommand  = "unset"
+)
+
+func (s *Server) Tag(ctx context.Context, req *pb.TagRequest) (*pb.Empty, error) {
+	if req.Command == tagUpdateCommand {
+		err := s.serf.SetTags(req.Tags)
+		return &pb.Empty{}, err
+	}
+	if req.Command == tagUnsetCommand {
+		err := s.serf.UnsetTagKeys(req.Keys)
+		return &pb.Empty{}, err
+	}
+	return nil, fmt.Errorf("invalid tag command %s", req.Command)
+}

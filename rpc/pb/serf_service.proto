@@ -76,6 +76,12 @@ message RttRequest {
     string second = 2;
 }
 
+message TagRequest {
+    string command = 1;
+    map<string, string> tags = 2;
+    repeated string keys = 3;
+}
+
 service Serf{
     rpc hello(StringValue) returns (StringValue);
     rpc helloStream(StringValue) returns (stream StringValue);
@@ -88,4 +94,5 @@ service Serf{
     rpc join(JoinRequest) returns (IntValue);
     rpc leave(Empty) returns (Empty);
     rpc rtt(RttRequest) returns (google.protobuf.Duration);
+    rpc tag(TagRequest) returns (Empty);
 }

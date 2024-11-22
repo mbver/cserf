@@ -443,10 +443,7 @@ func (s *Serf) schedule() {
 	}
 }
 
-func (s *Serf) SetTags(tags map[string]string) error {
-	s.tagL.Lock()
-	s.tags = tags
-	s.tagL.Unlock()
+func (s *Serf) updateMemberlistTags() error {
 	encoded, err := encodeTags(s.tags)
 	if len(encoded) > memberlist.TagMaxSize { // no need, memberlist can do this!
 		return memberlist.ErrMaxTagSizeExceed
@@ -455,6 +452,22 @@ func (s *Serf) SetTags(tags map[string]string) error {
 		return err
 	}
 	return s.mlist.UpdateTags(encoded)
+}
+
+func (s *Serf) SetTags(tags map[string]string) error {
+	s.tagL.Lock()
+	defer s.tagL.Unlock()
+	s.tags = tags
+	return s.updateMemberlistTags()
+}
+
+func (s *Serf) UnsetTagKeys(keys []string) error {
+	s.tagL.Lock()
+	defer s.tagL.Unlock()
+	for _, k := range keys {
+		delete(s.tags, k)
+	}
+	return s.updateMemberlistTags()
 }
 
 func (s *Serf) getTag(name string) string {
