@@ -2,6 +2,7 @@ package serf
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 
@@ -50,4 +51,16 @@ func randIntN(n int) int {
 		return 0
 	}
 	return int(rand.Uint32() % uint32(n))
+}
+
+func toJsonTag(tag []byte) (string, error) {
+	m, err := decodeTags(tag)
+	if err != nil {
+		return "", err
+	}
+	jbytes, err := json.Marshal(m)
+	if err != nil {
+		return "", err
+	}
+	return string(jbytes), nil
 }

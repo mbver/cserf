@@ -148,3 +148,20 @@ func (s *Server) Active(ctx context.Context, req *pb.Empty) (*pb.MembersResponse
 	}
 	return res, nil
 }
+
+func (s *Server) Members(ctx context.Context, req *pb.Empty) (*pb.MembersResponse, error) {
+	nodes := s.serf.Members()
+	res := &pb.MembersResponse{
+		Members: make([]*pb.Member, len(nodes)),
+	}
+	for i, n := range nodes {
+		res.Members[i] = &pb.Member{
+			Id:    n.ID,
+			Addr:  n.Addr,
+			Tags:  n.Tags,
+			State: n.State,
+			Lives: uint32(n.Lives),
+		}
+	}
+	return res, nil
+}

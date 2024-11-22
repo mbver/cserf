@@ -70,4 +70,5 @@ service Serf{
     rpc action(ActionRequest) returns (Empty);
     rpc reach(Empty) returns (ReachResponse);
     rpc active(Empty) returns (MembersResponse);
+    rpc members(Empty) returns (MembersResponse);
 }

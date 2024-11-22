@@ -108,3 +108,9 @@ func (c *Client) Active() (*pb.MembersResponse, error) {
 	defer cancel()
 	return c.client.Active(ctx, &pb.Empty{})
 }
+
+func (c *Client) Members() (*pb.MembersResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return c.client.Members(ctx, &pb.Empty{})
+}
