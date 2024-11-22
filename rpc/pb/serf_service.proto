@@ -81,4 +81,5 @@ service Serf{
     rpc active(Empty) returns (MembersResponse);
     rpc members(Empty) returns (MembersResponse);
     rpc join(JoinRequest) returns (IntValue);
+    rpc leave(Empty) returns (Empty);
 }

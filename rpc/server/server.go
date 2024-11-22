@@ -172,3 +172,8 @@ func (s *Server) Join(ctx context.Context, req *pb.JoinRequest) (*pb.IntValue, e
 		Value: int32(n),
 	}, err
 }
+
+func (s *Server) Leave(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+	err := s.serf.Leave()
+	return &pb.Empty{}, err
+}

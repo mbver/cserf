@@ -49,6 +49,7 @@ func main() {
 	cmd.AddCommand(ReachCommand())
 	cmd.AddCommand(MembersCommand())
 	cmd.AddCommand(JoinCommand())
+	cmd.AddCommand(LeaveCommand())
 
 	cmd.Execute()
 }

@@ -124,3 +124,9 @@ func (c *Client) Join(req *pb.JoinRequest) (*pb.IntValue, error) {
 	defer cancel()
 	return c.client.Join(ctx, req)
 }
+
+func (c *Client) Leave(req *pb.Empty) (*pb.Empty, error) {
+	ctx, cancel := defaultCtx()
+	defer cancel()
+	return c.client.Leave(ctx, req)
+}
