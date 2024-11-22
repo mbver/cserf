@@ -9,6 +9,7 @@ import (
 	"github.com/mbver/cserf/rpc/pb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 type Server struct {
@@ -176,4 +177,20 @@ func (s *Server) Join(ctx context.Context, req *pb.JoinRequest) (*pb.IntValue, e
 func (s *Server) Leave(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	err := s.serf.Leave()
 	return &pb.Empty{}, err
+}
+
+func (s *Server) Rtt(ctx context.Context, req *pb.RttRequest) (*durationpb.Duration, error) {
+	first := s.serf.GetCachedCoord(req.First)
+	if first == nil {
+		return nil, fmt.Errorf("no coord for node %s", req.First)
+	}
+	if req.Second == "" {
+		req.Second = s.serf.ID()
+	}
+	second := s.serf.GetCachedCoord(req.Second)
+	if second == nil {
+		return nil, fmt.Errorf("no coord for node %s", req.Second)
+	}
+	rtt := first.DistanceTo(second)
+	return durationpb.New(rtt), nil
 }

@@ -71,6 +71,11 @@ message IntValue {
     int32 value = 1;
 }
 
+message RttRequest {
+    string first = 1;
+    string second = 2;
+}
+
 service Serf{
     rpc hello(StringValue) returns (StringValue);
     rpc helloStream(StringValue) returns (stream StringValue);
@@ -82,4 +87,5 @@ service Serf{
     rpc members(Empty) returns (MembersResponse);
     rpc join(JoinRequest) returns (IntValue);
     rpc leave(Empty) returns (Empty);
+    rpc rtt(RttRequest) returns (google.protobuf.Duration);
 }

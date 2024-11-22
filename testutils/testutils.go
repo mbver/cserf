@@ -392,6 +392,7 @@ func CreateTestServer(opts *TestNodeOpts, addr string) (func(), error) {
 		Certificates: []tls.Certificate{serverCert},
 	})
 	s, cleanup1, err := TestNode(opts)
+	fmt.Println("====== node id", s.ID())
 	cleanup2 := CombineCleanup(cleanup1, cleanup)
 	if err != nil {
 		return cleanup2, err

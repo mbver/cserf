@@ -9,6 +9,7 @@ import (
 	"github.com/mbver/cserf/rpc/pb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 type Client struct {
@@ -129,4 +130,10 @@ func (c *Client) Leave(req *pb.Empty) (*pb.Empty, error) {
 	ctx, cancel := defaultCtx()
 	defer cancel()
 	return c.client.Leave(ctx, req)
+}
+
+func (c *Client) Rtt(req *pb.RttRequest) (*durationpb.Duration, error) {
+	ctx, cancel := defaultCtx()
+	defer cancel()
+	return c.client.Rtt(ctx, req)
 }

@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -32,6 +33,7 @@ type SerfClient interface {
 	Members(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MembersResponse, error)
 	Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*IntValue, error)
 	Leave(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	Rtt(ctx context.Context, in *RttRequest, opts ...grpc.CallOption) (*durationpb.Duration, error)
 }
 
 type serfClient struct {
@@ -178,6 +180,15 @@ func (c *serfClient) Leave(ctx context.Context, in *Empty, opts ...grpc.CallOpti
 	return out, nil
 }
 
+func (c *serfClient) Rtt(ctx context.Context, in *RttRequest, opts ...grpc.CallOption) (*durationpb.Duration, error) {
+	out := new(durationpb.Duration)
+	err := c.cc.Invoke(ctx, "/pb.Serf/rtt", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SerfServer is the server API for Serf service.
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
@@ -192,6 +203,7 @@ type SerfServer interface {
 	Members(context.Context, *Empty) (*MembersResponse, error)
 	Join(context.Context, *JoinRequest) (*IntValue, error)
 	Leave(context.Context, *Empty) (*Empty, error)
+	Rtt(context.Context, *RttRequest) (*durationpb.Duration, error)
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -228,6 +240,9 @@ func (UnimplementedSerfServer) Join(context.Context, *JoinRequest) (*IntValue, e
 }
 func (UnimplementedSerfServer) Leave(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Leave not implemented")
+}
+func (UnimplementedSerfServer) Rtt(context.Context, *RttRequest) (*durationpb.Duration, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Rtt not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
 
@@ -428,6 +443,24 @@ func _Serf_Leave_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Serf_Rtt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RttRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerfServer).Rtt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Serf/rtt",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerfServer).Rtt(ctx, req.(*RttRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Serf_ServiceDesc is the grpc.ServiceDesc for Serf service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -466,6 +499,10 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "leave",
 			Handler:    _Serf_Leave_Handler,
+		},
+		{
+			MethodName: "rtt",
+			Handler:    _Serf_Rtt_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

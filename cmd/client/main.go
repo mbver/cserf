@@ -50,6 +50,7 @@ func main() {
 	cmd.AddCommand(MembersCommand())
 	cmd.AddCommand(JoinCommand())
 	cmd.AddCommand(LeaveCommand())
+	cmd.AddCommand(RttCommand())
 
 	cmd.Execute()
 }
