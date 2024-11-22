@@ -52,6 +52,7 @@ func main() {
 	cmd.AddCommand(LeaveCommand())
 	cmd.AddCommand(RttCommand())
 	cmd.AddCommand(TagsCommand())
+	cmd.AddCommand(InfoCommand())
 
 	cmd.Execute()
 }

@@ -143,3 +143,9 @@ func (c *Client) Tag(req *pb.TagRequest) (*pb.Empty, error) {
 	defer cancel()
 	return c.client.Tag(ctx, req)
 }
+
+func (c *Client) Info(req *pb.Empty) (*pb.Info, error) {
+	ctx, cancel := defaultCtx()
+	defer cancel()
+	return c.client.Info(ctx, req)
+}

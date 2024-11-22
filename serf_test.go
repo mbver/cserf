@@ -752,7 +752,7 @@ func TestSerf_LocalMember(t *testing.T) {
 
 	n := s.LocalMember()
 	require.Equal(t, n.ID, s.ID())
-	tags, err := decodeTags(n.Tags)
+	tags := ToTagMap(n.Tags)
 	require.Nil(t, err)
 	require.True(t, reflect.DeepEqual(tags, s.tags))
 	newTags := map[string]string{
@@ -763,7 +763,7 @@ func TestSerf_LocalMember(t *testing.T) {
 	require.Nil(t, err)
 
 	n = s.LocalMember()
-	tags, err = decodeTags(n.Tags)
+	tags = ToTagMap(n.Tags)
 	require.Nil(t, err)
 	require.True(t, reflect.DeepEqual(tags, newTags))
 }

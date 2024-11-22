@@ -358,8 +358,19 @@ func (s *Serf) NumActive() int {
 	return s.mlist.NumActive()
 }
 
-func (s *Serf) LocalMember() *memberlist.Node {
-	return s.mlist.LocalNodeState().Node
+func (s *Serf) LocalMember() *Member {
+	n := s.mlist.LocalNodeState()
+	tags, err := toTagString(n.Node.Tags)
+	if err != nil {
+		s.logger.Printf("[ERR] serf: failed to decode tags %v", err)
+	}
+	return &Member{
+		ID:    n.Node.ID,
+		Addr:  n.Node.UDPAddress().String(),
+		Tags:  tags,
+		State: n.State.String(),
+		Lives: int(n.Lives),
+	}
 }
 
 func (s *Serf) AdvertiseAddress() (string, error) {

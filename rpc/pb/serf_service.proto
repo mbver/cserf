@@ -82,6 +82,10 @@ message TagRequest {
     repeated string keys = 3;
 }
 
+message Info {
+    Member node = 1;
+    map<string, string> stats = 2;
+}
 service Serf{
     rpc hello(StringValue) returns (StringValue);
     rpc helloStream(StringValue) returns (stream StringValue);
@@ -95,4 +99,5 @@ service Serf{
     rpc leave(Empty) returns (Empty);
     rpc rtt(RttRequest) returns (google.protobuf.Duration);
     rpc tag(TagRequest) returns (Empty);
+    rpc info(Empty) returns (Info);
 }

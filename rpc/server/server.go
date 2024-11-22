@@ -133,19 +133,23 @@ func (s *Server) Reach(ctx context.Context, req *pb.Empty) (*pb.ReachResponse, e
 	}, nil
 }
 
+func toPbMember(n *serf.Member) *pb.Member {
+	return &pb.Member{
+		Id:    n.ID,
+		Addr:  n.Addr,
+		Tags:  n.Tags,
+		State: n.State,
+		Lives: uint32(n.Lives),
+	}
+}
+
 func (s *Server) Active(ctx context.Context, req *pb.Empty) (*pb.MembersResponse, error) {
 	nodes := s.serf.ActiveNodes()
 	res := &pb.MembersResponse{
 		Members: make([]*pb.Member, len(nodes)),
 	}
 	for i, n := range nodes {
-		res.Members[i] = &pb.Member{
-			Id:    n.ID,
-			Addr:  n.Addr,
-			Tags:  n.Tags,
-			State: n.State,
-			Lives: uint32(n.Lives),
-		}
+		res.Members[i] = toPbMember(n)
 	}
 	return res, nil
 }
@@ -156,13 +160,7 @@ func (s *Server) Members(ctx context.Context, req *pb.Empty) (*pb.MembersRespons
 		Members: make([]*pb.Member, len(nodes)),
 	}
 	for i, n := range nodes {
-		res.Members[i] = &pb.Member{
-			Id:    n.ID,
-			Addr:  n.Addr,
-			Tags:  n.Tags,
-			State: n.State,
-			Lives: uint32(n.Lives),
-		}
+		res.Members[i] = toPbMember(n)
 	}
 	return res, nil
 }
@@ -210,4 +208,13 @@ func (s *Server) Tag(ctx context.Context, req *pb.TagRequest) (*pb.Empty, error)
 		return &pb.Empty{}, err
 	}
 	return nil, fmt.Errorf("invalid tag command %s", req.Command)
+}
+
+func (s *Server) Info(ctx context.Context, req *pb.Empty) (*pb.Info, error) {
+	node := s.serf.LocalMember()
+	stats := s.serf.Stats()
+	return &pb.Info{
+		Node:  toPbMember(node),
+		Stats: stats,
+	}, nil
 }

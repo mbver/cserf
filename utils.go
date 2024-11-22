@@ -69,3 +69,16 @@ func toTagString(tag []byte) (string, error) {
 	res := strings.TrimSuffix(s, ",")
 	return res, nil
 }
+
+func ToTagMap(s string) map[string]string {
+	m := map[string]string{}
+	kvs := strings.Split(s, ",")
+	for _, kv := range kvs {
+		pair := strings.Split(kv, "=")
+		if len(pair) < 2 {
+			continue
+		}
+		m[pair[0]] = pair[1]
+	}
+	return m
+}
