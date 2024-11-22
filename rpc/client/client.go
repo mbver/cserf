@@ -31,8 +31,12 @@ func (c *Client) Close() {
 	c.conn.Close()
 }
 
+func defaultCtx() (context.Context, func()) {
+	return context.WithTimeout(context.Background(), 5*time.Second)
+}
+
 func (c *Client) Hello(name string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := defaultCtx()
 	defer cancel()
 	res, err := c.client.Hello(ctx, &pb.StringValue{Value: name})
 	if err != nil {
@@ -42,7 +46,7 @@ func (c *Client) Hello(name string) (string, error) {
 }
 
 func (c *Client) HelloStream(name string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := defaultCtx()
 	defer cancel()
 	stream, err := c.client.HelloStream(ctx, &pb.StringValue{Value: name})
 	if err != nil {
@@ -61,7 +65,7 @@ func (c *Client) HelloStream(name string) (string, error) {
 }
 
 func (c *Client) Query(params *pb.QueryParam) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := defaultCtx()
 	defer cancel()
 	stream, err := c.client.Query(ctx, params)
 	if err != nil {
@@ -80,7 +84,7 @@ func (c *Client) Query(params *pb.QueryParam) (string, error) {
 }
 
 func (c *Client) Key(command string, key string) (*pb.KeyResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := defaultCtx()
 	defer cancel()
 	return c.client.Key(ctx, &pb.KeyRequest{
 		Command: command,
@@ -89,7 +93,7 @@ func (c *Client) Key(command string, key string) (*pb.KeyResponse, error) {
 }
 
 func (c *Client) Action(name string, payload []byte) (*pb.Empty, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := defaultCtx()
 	defer cancel()
 	return c.client.Action(ctx, &pb.ActionRequest{
 		Name:    name,
@@ -98,19 +102,25 @@ func (c *Client) Action(name string, payload []byte) (*pb.Empty, error) {
 }
 
 func (c *Client) Reach() (*pb.ReachResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := defaultCtx()
 	defer cancel()
 	return c.client.Reach(ctx, &pb.Empty{})
 }
 
 func (c *Client) Active() (*pb.MembersResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := defaultCtx()
 	defer cancel()
 	return c.client.Active(ctx, &pb.Empty{})
 }
 
 func (c *Client) Members() (*pb.MembersResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := defaultCtx()
 	defer cancel()
 	return c.client.Members(ctx, &pb.Empty{})
+}
+
+func (c *Client) Join(req *pb.JoinRequest) (*pb.IntValue, error) {
+	ctx, cancel := defaultCtx()
+	defer cancel()
+	return c.client.Join(ctx, req)
 }

@@ -62,6 +62,15 @@ message MembersResponse {
     repeated Member members = 1;
 }
 
+message JoinRequest {
+    repeated string addrs = 1;
+    bool ignore_old = 2;
+}
+
+message IntValue {
+    int32 value = 1;
+}
+
 service Serf{
     rpc hello(StringValue) returns (StringValue);
     rpc helloStream(StringValue) returns (stream StringValue);
@@ -71,4 +80,5 @@ service Serf{
     rpc reach(Empty) returns (ReachResponse);
     rpc active(Empty) returns (MembersResponse);
     rpc members(Empty) returns (MembersResponse);
+    rpc join(JoinRequest) returns (IntValue);
 }

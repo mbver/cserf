@@ -30,6 +30,7 @@ type SerfClient interface {
 	Reach(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ReachResponse, error)
 	Active(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MembersResponse, error)
 	Members(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MembersResponse, error)
+	Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*IntValue, error)
 }
 
 type serfClient struct {
@@ -158,6 +159,15 @@ func (c *serfClient) Members(ctx context.Context, in *Empty, opts ...grpc.CallOp
 	return out, nil
 }
 
+func (c *serfClient) Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*IntValue, error) {
+	out := new(IntValue)
+	err := c.cc.Invoke(ctx, "/pb.Serf/join", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SerfServer is the server API for Serf service.
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
@@ -170,6 +180,7 @@ type SerfServer interface {
 	Reach(context.Context, *Empty) (*ReachResponse, error)
 	Active(context.Context, *Empty) (*MembersResponse, error)
 	Members(context.Context, *Empty) (*MembersResponse, error)
+	Join(context.Context, *JoinRequest) (*IntValue, error)
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -200,6 +211,9 @@ func (UnimplementedSerfServer) Active(context.Context, *Empty) (*MembersResponse
 }
 func (UnimplementedSerfServer) Members(context.Context, *Empty) (*MembersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Members not implemented")
+}
+func (UnimplementedSerfServer) Join(context.Context, *JoinRequest) (*IntValue, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Join not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
 
@@ -364,6 +378,24 @@ func _Serf_Members_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Serf_Join_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerfServer).Join(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Serf/join",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerfServer).Join(ctx, req.(*JoinRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Serf_ServiceDesc is the grpc.ServiceDesc for Serf service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -394,6 +426,10 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "members",
 			Handler:    _Serf_Members_Handler,
+		},
+		{
+			MethodName: "join",
+			Handler:    _Serf_Join_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

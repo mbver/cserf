@@ -165,3 +165,10 @@ func (s *Server) Members(ctx context.Context, req *pb.Empty) (*pb.MembersRespons
 	}
 	return res, nil
 }
+
+func (s *Server) Join(ctx context.Context, req *pb.JoinRequest) (*pb.IntValue, error) {
+	n, err := s.serf.Join(req.Addrs, req.IgnoreOld)
+	return &pb.IntValue{
+		Value: int32(n),
+	}, err
+}
