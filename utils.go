@@ -2,9 +2,9 @@ package serf
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/hashicorp/go-msgpack/v2/codec"
 )
@@ -53,14 +53,19 @@ func randIntN(n int) int {
 	return int(rand.Uint32() % uint32(n))
 }
 
-func toJsonTag(tag []byte) (string, error) {
+func toTagString(tag []byte) (string, error) {
 	m, err := decodeTags(tag)
 	if err != nil {
 		return "", err
 	}
-	jbytes, err := json.Marshal(m)
-	if err != nil {
-		return "", err
+	buf := &strings.Builder{}
+	for k, v := range m {
+		buf.WriteString(k)
+		buf.WriteString("=")
+		buf.WriteString(v)
+		buf.WriteString(",")
 	}
-	return string(jbytes), nil
+	s := buf.String()
+	res := strings.TrimSuffix(s, ",")
+	return res, nil
 }

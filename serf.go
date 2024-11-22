@@ -320,7 +320,7 @@ func (s *Serf) Members() []*Member {
 	nodes := s.mlist.Members()
 	members := make([]*Member, 0, len(nodes))
 	for _, n := range nodes {
-		jtag, err := toJsonTag(n.Node.Tags)
+		jtag, err := toTagString(n.Node.Tags)
 		if err != nil {
 			s.logger.Printf("[ERR] serf: failed to decode tags %v", err)
 		}
@@ -339,7 +339,7 @@ func (s *Serf) ActiveNodes() []*Member {
 	nodes := s.mlist.ActiveNodes()
 	members := make([]*Member, 0, len(nodes))
 	for _, n := range nodes {
-		jtag, err := toJsonTag(n.Node.Tags)
+		jtag, err := toTagString(n.Node.Tags)
 		if err != nil {
 			s.logger.Printf("[ERR] serf: failed to decode tags %v", err)
 		}
