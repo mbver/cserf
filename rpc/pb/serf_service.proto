@@ -86,6 +86,7 @@ message Info {
     Member node = 1;
     map<string, string> stats = 2;
 }
+
 service Serf{
     rpc query(QueryParam) returns (stream StringValue);
     rpc key(KeyRequest) returns (KeyResponse);
@@ -98,4 +99,5 @@ service Serf{
     rpc rtt(RttRequest) returns (google.protobuf.Duration);
     rpc tag(TagRequest) returns (Empty);
     rpc info(Empty) returns (Info);
+    rpc monitor(StringValue) returns (stream StringValue);
 }

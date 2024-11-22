@@ -69,7 +69,6 @@ func (q *QueryEvent) String() string {
 type ActionEvent struct {
 	LTime   LamportTime
 	Name    string
-	ID      uint32
 	Payload []byte
 }
 

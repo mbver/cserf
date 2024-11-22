@@ -53,7 +53,7 @@ func randIntN(n int) int {
 	return int(rand.Uint32() % uint32(n))
 }
 
-func toTagString(tag []byte) (string, error) {
+func ToTagString(tag []byte) (string, error) {
 	m, err := decodeTags(tag)
 	if err != nil {
 		return "", err

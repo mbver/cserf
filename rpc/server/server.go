@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
+	"strings"
 
 	serf "github.com/mbver/cserf"
 	"github.com/mbver/cserf/rpc/pb"
+	memberlist "github.com/mbver/mlist"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -200,4 +203,64 @@ func (s *Server) Info(ctx context.Context, req *pb.Empty) (*pb.Info, error) {
 		Node:  toPbMember(node),
 		Stats: stats,
 	}, nil
+}
+
+func eventToString(event serf.Event) string {
+	switch e := event.(type) {
+	case *serf.CoalescedMemberEvent:
+		return memberEventToString(e)
+	case *serf.ActionEvent:
+		return actionEventToString(e)
+	case *serf.QueryEvent:
+		return queryEventToString(e)
+	}
+	return "unknow-event"
+}
+
+func memberEventToString(e *serf.CoalescedMemberEvent) string {
+	buf := strings.Builder{}
+	buf.WriteString(fmt.Sprintf("{\n  event-type: %s\n", e.Type.String()))
+	buf.WriteString("  members:\n")
+	for _, n := range e.Members {
+		buf.WriteString(fmt.Sprintf("    %s,", nodeToString(n)))
+	}
+	buf.WriteString("}")
+	return buf.String()
+}
+
+func nodeToString(n *memberlist.Node) string {
+	tags, _ := serf.ToTagString(n.Tags)
+	addr := n.UDPAddress().String()
+	return fmt.Sprintf("%s - %s - %s", n.ID, addr, tags)
+}
+
+func actionEventToString(e *serf.ActionEvent) string {
+	return fmt.Sprintf("action: %d - %s - %s", e.LTime, e.Name, string(e.Payload))
+}
+
+func queryEventToString(e *serf.QueryEvent) string {
+	addr := net.JoinHostPort(e.SourceIP.String(), strconv.Itoa(int(e.SourcePort)))
+	return fmt.Sprintf(`query - %d - %d - %s - %s
+from: %s - %s`, e.LTime, e.ID, e.Name, e.Payload, addr, e.NodeID)
+}
+
+func (s *Server) Monitor(filter *pb.StringValue, stream pb.Serf_MonitorServer) error {
+	eventCh := make(chan serf.Event, 1024)
+	h := s.serf.StartStreamEvents(eventCh, filter.Value)
+	defer s.serf.StopStreamEvents(h)
+	for {
+		select {
+		case <-stream.Context().Done(): // TODO: LOG TERMINATION
+			fmt.Println("==== stop streaming")
+			return nil
+		case e := <-eventCh:
+			err := stream.Send(&pb.StringValue{
+				Value: eventToString(e),
+			})
+			if err != nil { // TODO: LOG ERROR
+				fmt.Println("======== got error")
+				return err
+			}
+		}
+	}
 }

@@ -32,10 +32,14 @@ func JoinCommand() *cobra.Command {
 				Addrs:     addrs,
 				IgnoreOld: ignoreOld,
 			})
-			out.Result("num of successful joins", fmt.Sprintf("%d/%d", res.Value, len(addrs)))
 			if err != nil {
 				out.Error(err)
+				if res == nil {
+					return
+				}
 			}
+			out.Result("num of successful joins", fmt.Sprintf("%d/%d", res.Value, len(addrs)))
+
 		},
 	}
 	cmd.Flags().String(FlagAddrs, "", `list of existing nodes' addresses to join, separated by ","`)

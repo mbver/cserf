@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
+// TODO: a logger then?
 type Client struct {
 	client pb.SerfClient
 	conn   *grpc.ClientConn
@@ -119,4 +120,13 @@ func (c *Client) Info(req *pb.Empty) (*pb.Info, error) {
 	ctx, cancel := defaultCtx()
 	defer cancel()
 	return c.client.Info(ctx, req)
+}
+
+func (c *Client) Monitor(filter *pb.StringValue) (pb.Serf_MonitorClient, func(), error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := c.client.Monitor(ctx, filter)
+	if err != nil {
+		return nil, cancel, err
+	}
+	return stream, cancel, nil
 }

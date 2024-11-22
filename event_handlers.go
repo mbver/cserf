@@ -105,10 +105,21 @@ func (m *streamEventHandlerManager) deregister(h *StreamEventHandler) {
 
 type StreamEventHandler struct {
 	eventCh chan Event
+	filters []*eventFilter
 }
 
 func (h *StreamEventHandler) HandleEvent(e Event) {
-	h.eventCh <- e
+	accept := false
+	for _, f := range h.filters {
+		if f.matches(e) {
+			accept = true
+			break
+		}
+	}
+	if !accept {
+		return
+	}
+	forwardEvent(e, h.eventCh)
 }
 
 type scriptEventHandlerManager struct {
@@ -392,4 +403,12 @@ func CreateScriptHandlers(s string, invokeCh chan *invokeScript) []*ScriptEventH
 		handlers = append(handlers, result)
 	}
 	return handlers
+}
+
+func CreateStreamHandler(eventCh chan Event, filter string) *StreamEventHandler {
+	filters := ParseEventFilters(filter)
+	return &StreamEventHandler{
+		eventCh: eventCh,
+		filters: filters,
+	}
 }

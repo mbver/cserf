@@ -34,6 +34,7 @@ type SerfClient interface {
 	Rtt(ctx context.Context, in *RttRequest, opts ...grpc.CallOption) (*durationpb.Duration, error)
 	Tag(ctx context.Context, in *TagRequest, opts ...grpc.CallOption) (*Empty, error)
 	Info(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Info, error)
+	Monitor(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_MonitorClient, error)
 }
 
 type serfClient struct {
@@ -166,6 +167,38 @@ func (c *serfClient) Info(ctx context.Context, in *Empty, opts ...grpc.CallOptio
 	return out, nil
 }
 
+func (c *serfClient) Monitor(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_MonitorClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Serf_ServiceDesc.Streams[1], "/pb.Serf/monitor", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &serfMonitorClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Serf_MonitorClient interface {
+	Recv() (*StringValue, error)
+	grpc.ClientStream
+}
+
+type serfMonitorClient struct {
+	grpc.ClientStream
+}
+
+func (x *serfMonitorClient) Recv() (*StringValue, error) {
+	m := new(StringValue)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // SerfServer is the server API for Serf service.
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
@@ -181,6 +214,7 @@ type SerfServer interface {
 	Rtt(context.Context, *RttRequest) (*durationpb.Duration, error)
 	Tag(context.Context, *TagRequest) (*Empty, error)
 	Info(context.Context, *Empty) (*Info, error)
+	Monitor(*StringValue, Serf_MonitorServer) error
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -220,6 +254,9 @@ func (UnimplementedSerfServer) Tag(context.Context, *TagRequest) (*Empty, error)
 }
 func (UnimplementedSerfServer) Info(context.Context, *Empty) (*Info, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Info not implemented")
+}
+func (UnimplementedSerfServer) Monitor(*StringValue, Serf_MonitorServer) error {
+	return status.Errorf(codes.Unimplemented, "method Monitor not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
 
@@ -435,6 +472,27 @@ func _Serf_Info_Handler(srv interface{}, ctx context.Context, dec func(interface
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Serf_Monitor_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StringValue)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(SerfServer).Monitor(m, &serfMonitorServer{stream})
+}
+
+type Serf_MonitorServer interface {
+	Send(*StringValue) error
+	grpc.ServerStream
+}
+
+type serfMonitorServer struct {
+	grpc.ServerStream
+}
+
+func (x *serfMonitorServer) Send(m *StringValue) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // Serf_ServiceDesc is the grpc.ServiceDesc for Serf service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -487,6 +545,11 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "query",
 			Handler:       _Serf_Query_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "monitor",
+			Handler:       _Serf_Monitor_Handler,
 			ServerStreams: true,
 		},
 	},

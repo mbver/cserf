@@ -57,5 +57,7 @@ func main() {
 	cmd.AddCommand(TagsCommand())
 	cmd.AddCommand(InfoCommand())
 	cmd.AddCommand(KeyGenCommand())
+	cmd.AddCommand(MonitorCommand())
+
 	cmd.Execute()
 }

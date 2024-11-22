@@ -220,10 +220,8 @@ func testNode(opts *testNodeOpts) (*Serf, func(), error) {
 	cleanup2 := combineCleanup(s.Shutdown, cleanup1)
 	if opts.eventCh != nil {
 		time.Sleep(50 * time.Millisecond) // wait for initial events flushed out
-		stream := StreamEventHandler{
-			eventCh: opts.eventCh,
-		}
-		s.eventHandlers.stream.register(&stream)
+		stream := CreateStreamHandler(opts.eventCh, "")
+		s.eventHandlers.stream.register(stream)
 	}
 	return s, cleanup2, nil
 }

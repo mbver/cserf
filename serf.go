@@ -320,7 +320,7 @@ func (s *Serf) Members() []*Member {
 	nodes := s.mlist.Members()
 	members := make([]*Member, 0, len(nodes))
 	for _, n := range nodes {
-		jtag, err := toTagString(n.Node.Tags)
+		jtag, err := ToTagString(n.Node.Tags)
 		if err != nil {
 			s.logger.Printf("[ERR] serf: failed to decode tags %v", err)
 		}
@@ -339,7 +339,7 @@ func (s *Serf) ActiveNodes() []*Member {
 	nodes := s.mlist.ActiveNodes()
 	members := make([]*Member, 0, len(nodes))
 	for _, n := range nodes {
-		jtag, err := toTagString(n.Node.Tags)
+		jtag, err := ToTagString(n.Node.Tags)
 		if err != nil {
 			s.logger.Printf("[ERR] serf: failed to decode tags %v", err)
 		}
@@ -360,7 +360,7 @@ func (s *Serf) NumActive() int {
 
 func (s *Serf) LocalMember() *Member {
 	n := s.mlist.LocalNodeState()
-	tags, err := toTagString(n.Node.Tags)
+	tags, err := ToTagString(n.Node.Tags)
 	if err != nil {
 		s.logger.Printf("[ERR] serf: failed to decode tags %v", err)
 	}
@@ -485,4 +485,14 @@ func (s *Serf) getTag(name string) string {
 	s.tagL.Lock()
 	defer s.tagL.Unlock()
 	return s.tags[name]
+}
+
+func (s *Serf) StartStreamEvents(eventCh chan Event, filter string) *StreamEventHandler {
+	h := CreateStreamHandler(eventCh, filter)
+	s.eventHandlers.stream.register(h)
+	return h
+}
+
+func (s *Serf) StopStreamEvents(h *StreamEventHandler) {
+	s.eventHandlers.stream.deregister(h)
 }
