@@ -36,35 +36,6 @@ func defaultCtx() (context.Context, func()) {
 	return context.WithTimeout(context.Background(), 5*time.Second)
 }
 
-func (c *Client) Hello(name string) (string, error) {
-	ctx, cancel := defaultCtx()
-	defer cancel()
-	res, err := c.client.Hello(ctx, &pb.StringValue{Value: name})
-	if err != nil {
-		return "", err
-	}
-	return res.Value, nil
-}
-
-func (c *Client) HelloStream(name string) (string, error) {
-	ctx, cancel := defaultCtx()
-	defer cancel()
-	stream, err := c.client.HelloStream(ctx, &pb.StringValue{Value: name})
-	if err != nil {
-		return "", err
-	}
-	buf := strings.Builder{}
-
-	for {
-		res, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		buf.WriteString(res.Value)
-	}
-	return buf.String(), nil
-}
-
 func (c *Client) Query(params *pb.QueryParam) (string, error) {
 	ctx, cancel := defaultCtx()
 	defer cancel()

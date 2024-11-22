@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/mbver/cserf/rpc/pb"
 	"github.com/mbver/cserf/testutils"
 	"github.com/stretchr/testify/require"
 )
@@ -41,25 +42,9 @@ func TestRPC_MismatchedCerts(t *testing.T) {
 	require.Nil(t, err)
 	defer client.Close()
 
-	_, err = client.Hello("world")
+	_, err = client.Info(&pb.Empty{})
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "connection error")
-}
-
-func TestRPC_Hello(t *testing.T) {
-	client, _, cleanup, err := testutils.ClientServerRPCFromSerf(nil)
-	defer cleanup()
-	require.Nil(t, err)
-
-	res, err := client.Hello("world")
-	require.Nil(t, err)
-	require.Contains(t, res, "world")
-
-	res, err = client.HelloStream("world")
-	require.Nil(t, err)
-	for i := 0; i < 3; i++ {
-		require.Contains(t, res, fmt.Sprintf("world%d", i))
-	}
 }
 
 func TestRPC_Query(t *testing.T) {

@@ -23,8 +23,6 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SerfClient interface {
-	Hello(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (*StringValue, error)
-	HelloStream(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error)
 	Query(ctx context.Context, in *QueryParam, opts ...grpc.CallOption) (Serf_QueryClient, error)
 	Key(ctx context.Context, in *KeyRequest, opts ...grpc.CallOption) (*KeyResponse, error)
 	Action(ctx context.Context, in *ActionRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -46,49 +44,8 @@ func NewSerfClient(cc grpc.ClientConnInterface) SerfClient {
 	return &serfClient{cc}
 }
 
-func (c *serfClient) Hello(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (*StringValue, error) {
-	out := new(StringValue)
-	err := c.cc.Invoke(ctx, "/pb.Serf/hello", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *serfClient) HelloStream(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_HelloStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Serf_ServiceDesc.Streams[0], "/pb.Serf/helloStream", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &serfHelloStreamClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type Serf_HelloStreamClient interface {
-	Recv() (*StringValue, error)
-	grpc.ClientStream
-}
-
-type serfHelloStreamClient struct {
-	grpc.ClientStream
-}
-
-func (x *serfHelloStreamClient) Recv() (*StringValue, error) {
-	m := new(StringValue)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 func (c *serfClient) Query(ctx context.Context, in *QueryParam, opts ...grpc.CallOption) (Serf_QueryClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Serf_ServiceDesc.Streams[1], "/pb.Serf/query", opts...)
+	stream, err := c.cc.NewStream(ctx, &Serf_ServiceDesc.Streams[0], "/pb.Serf/query", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -213,8 +170,6 @@ func (c *serfClient) Info(ctx context.Context, in *Empty, opts ...grpc.CallOptio
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
 type SerfServer interface {
-	Hello(context.Context, *StringValue) (*StringValue, error)
-	HelloStream(*StringValue, Serf_HelloStreamServer) error
 	Query(*QueryParam, Serf_QueryServer) error
 	Key(context.Context, *KeyRequest) (*KeyResponse, error)
 	Action(context.Context, *ActionRequest) (*Empty, error)
@@ -233,12 +188,6 @@ type SerfServer interface {
 type UnimplementedSerfServer struct {
 }
 
-func (UnimplementedSerfServer) Hello(context.Context, *StringValue) (*StringValue, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Hello not implemented")
-}
-func (UnimplementedSerfServer) HelloStream(*StringValue, Serf_HelloStreamServer) error {
-	return status.Errorf(codes.Unimplemented, "method HelloStream not implemented")
-}
 func (UnimplementedSerfServer) Query(*QueryParam, Serf_QueryServer) error {
 	return status.Errorf(codes.Unimplemented, "method Query not implemented")
 }
@@ -283,45 +232,6 @@ type UnsafeSerfServer interface {
 
 func RegisterSerfServer(s grpc.ServiceRegistrar, srv SerfServer) {
 	s.RegisterService(&Serf_ServiceDesc, srv)
-}
-
-func _Serf_Hello_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StringValue)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SerfServer).Hello(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pb.Serf/hello",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SerfServer).Hello(ctx, req.(*StringValue))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Serf_HelloStream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(StringValue)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(SerfServer).HelloStream(m, &serfHelloStreamServer{stream})
-}
-
-type Serf_HelloStreamServer interface {
-	Send(*StringValue) error
-	grpc.ServerStream
-}
-
-type serfHelloStreamServer struct {
-	grpc.ServerStream
-}
-
-func (x *serfHelloStreamServer) Send(m *StringValue) error {
-	return x.ServerStream.SendMsg(m)
 }
 
 func _Serf_Query_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -533,10 +443,6 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*SerfServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "hello",
-			Handler:    _Serf_Hello_Handler,
-		},
-		{
 			MethodName: "key",
 			Handler:    _Serf_Key_Handler,
 		},
@@ -578,11 +484,6 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "helloStream",
-			Handler:       _Serf_HelloStream_Handler,
-			ServerStreams: true,
-		},
 		{
 			StreamName:    "query",
 			Handler:       _Serf_Query_Handler,

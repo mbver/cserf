@@ -35,23 +35,6 @@ func CreateServer(addr string, cert credentials.TransportCredentials, serf *serf
 	return s, nil
 }
 
-func (s *Server) Hello(ctx context.Context, name *pb.StringValue) (*pb.StringValue, error) {
-	return &pb.StringValue{
-		Value: fmt.Sprintf("Hallo doch %s", name),
-	}, nil
-}
-
-func (s *Server) HelloStream(name *pb.StringValue, stream pb.Serf_HelloStreamServer) error {
-	for i := 0; i < 3; i++ {
-		if err := stream.Send(&pb.StringValue{
-			Value: fmt.Sprintf("hello%s%d,", name.Value, i),
-		}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func QueryParamFromPb(params *pb.QueryParam) *serf.QueryParam {
 	var res = &serf.QueryParam{}
 	res.Name = params.Name

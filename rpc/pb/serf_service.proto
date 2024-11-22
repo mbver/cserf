@@ -87,8 +87,6 @@ message Info {
     map<string, string> stats = 2;
 }
 service Serf{
-    rpc hello(StringValue) returns (StringValue);
-    rpc helloStream(StringValue) returns (stream StringValue);
     rpc query(QueryParam) returns (stream StringValue);
     rpc key(KeyRequest) returns (KeyResponse);
     rpc action(ActionRequest) returns (Empty);
