@@ -2,7 +2,10 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -18,7 +21,24 @@ type Client struct {
 	conn   *grpc.ClientConn
 }
 
-func CreateClient(addr string, creds credentials.TransportCredentials) (*Client, error) {
+func getClientCredentials(certPath string) (credentials.TransportCredentials, error) {
+	cert, err := os.ReadFile(certPath)
+	if err != nil {
+		return nil, err
+	}
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(cert)
+	creds := credentials.NewTLS(&tls.Config{
+		RootCAs: certPool,
+	})
+	return creds, nil
+}
+
+func CreateClient(addr string, certPath string) (*Client, error) {
+	creds, err := getClientCredentials(certPath)
+	if err != nil {
+		return nil, err
+	}
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return nil, err

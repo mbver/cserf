@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/client"
-	"github.com/mbver/cserf/testutils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -28,7 +27,7 @@ func main() {
 			addr := vp.GetString(FlagRpcAddr)
 			cert := vp.GetString(FlagCertPath)
 			var err error
-			gClient, err = testutils.CreateTestClient(addr, cert)
+			gClient, err = client.CreateClient(addr, cert)
 			out.Infof("connected to server at %s", addr)
 			if err != nil {
 				out.Error(err)

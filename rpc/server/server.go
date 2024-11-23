@@ -2,10 +2,14 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	serf "github.com/mbver/cserf"
 	"github.com/mbver/cserf/cmd/utils"
@@ -18,25 +22,119 @@ import (
 
 type Server struct {
 	pb.UnimplementedSerfServer
-	serf *serf.Serf
+	serf       *serf.Serf
+	logStreams *logStreamManager
+	logger     *log.Logger
 }
 
-func CreateServer(addr string, cert credentials.TransportCredentials, serf *serf.Serf) (*grpc.Server, error) {
+func CreateServer(conf *ServerConfig) (func(), error) {
+	cleanup := func() {}
+	if conf == nil {
+		return cleanup, fmt.Errorf("nil config")
+	}
+	creds, err := getCredentials(conf.CertPath, conf.KeyPath)
+	if err != nil {
+		return cleanup, err
+	}
+	logStreams := newLogStreamManager()
+	logger := createLogger(conf.LogOutput, logStreams, conf.LogPrefix)
+
+	serf, cleanup, err := createSerf(conf, logger)
+	if err != nil {
+		return cleanup, err
+	}
+
+	addr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		return nil, err
+		return cleanup, err
 	}
-	s := grpc.NewServer(grpc.Creds(cert))
-	pb.RegisterSerfServer(s, &Server{
-		serf: serf,
-	})
+	cleanup1 := CombineCleanup(cleanup, func() { l.Close() })
+	server := &Server{
+		serf:       serf,
+		logStreams: logStreams,
+		logger:     logger,
+	}
+	s := grpc.NewServer(grpc.Creds(creds))
+	pb.RegisterSerfServer(s, server)
 
 	go func() {
 		if err := s.Serve(l); err != nil {
-			fmt.Printf("[ERR] grpc server: %v", err)
+			logger.Printf("[ERR] grpc-server: failed serving %v", err)
 		}
 	}()
-	return s, nil
+	return cleanup1, nil
+}
+
+func getCredentials(certPath, keyPath string) (credentials.TransportCredentials, error) {
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		return nil, err
+	}
+	return credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}), nil
+}
+
+func createSerf(conf *ServerConfig, logger *log.Logger) (*serf.Serf, func(), error) {
+	cleanup := func() {}
+	b := &serf.SerfBuilder{}
+	b.WithLogger(logger)
+
+	// TODO: EXTRACT FROM CONFIG
+	key := []byte{79, 216, 231, 114, 9, 125, 153, 178, 238, 179, 230, 218, 77, 54, 187, 171, 185, 207, 73, 74, 215, 193, 176, 226, 217, 216, 91, 182, 168, 171, 223, 187}
+	keyring, err := memberlist.NewKeyring(nil, key)
+	if err != nil {
+		return nil, cleanup, err
+	}
+
+	b.WithKeyring(keyring)
+
+	// TODO: EXTRACT FROM CONFIG
+	mconf := testMemberlistConfig()
+	mconf.BindAddr = conf.BindAddr
+	mconf.BindPort = conf.BindPort
+	mconf.Label = "label" // remove
+	b.WithMemberlistConfig(mconf)
+
+	snapPath := tmpPath()
+	script, cleanup, err := createTestEventScript() // REMOVE
+	if err != nil {
+		return nil, cleanup, err
+	}
+	sconf := &serf.Config{ // TO EXTRACT FROM CONF
+		EventScript:            script,
+		LBufferSize:            1024,
+		QueryTimeoutMult:       16,
+		QueryResponseSizeLimit: 1024,
+		QuerySizeLimit:         1024,
+		ActionSizeLimit:        512,
+		SnapshotPath:           snapPath,
+		SnapshotMinCompactSize: 128 * 1024,
+		SnapshotDrainTimeout:   500 * time.Millisecond,
+		CoalesceInterval:       5 * time.Millisecond,
+		ReapInterval:           10 * time.Millisecond,
+		// ReconnectInterval:      1 * time.Millisecond,
+		MaxQueueDepth:    1024,
+		ReconnectTimeout: 5 * time.Millisecond,
+		TombstoneTimeout: 5 * time.Millisecond,
+	}
+	cleanup1 := CombineCleanup(cleanup, func() { // CONSIDER REMOVE
+		data, _ := os.ReadFile(sconf.SnapshotPath)
+		logger.Printf("### snapshot %s:", string(data))
+		os.Remove(sconf.SnapshotPath)
+	})
+	b.WithConfig(sconf)
+	s, err := b.Build()
+	if err != nil {
+		return nil, cleanup1, err
+	}
+	cleanup2 := CombineCleanup(s.Shutdown, cleanup1)
+	return s, cleanup2, nil
+}
+
+func (s *Server) Shutdown() {
+	s.serf.Shutdown()
 }
 
 func QueryParamFromPb(params *pb.QueryParam) *serf.QueryParam {
@@ -252,13 +350,14 @@ func (s *Server) Monitor(filter *pb.StringValue, stream pb.Serf_MonitorServer) e
 	for {
 		select {
 		case <-stream.Context().Done(): // TODO: LOG TERMINATION
-			fmt.Println("==== stop streaming gracefully...")
+			s.logger.Println("[INFO] grpc-server: stop streaming gracefully")
 			return nil
 		case e := <-eventCh:
 			err := stream.Send(&pb.StringValue{
 				Value: eventToString(e),
 			})
-			if err != nil { // TODO: LOG ERROR
+			if err != nil {
+				s.logger.Printf("[ERR] grpc-server: error sending stream %v", err)
 				if utils.ShouldStopStreaming(err) {
 					return err
 				}
