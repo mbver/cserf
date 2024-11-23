@@ -347,21 +347,39 @@ func (s *Server) Monitor(filter *pb.StringValue, stream pb.Serf_MonitorServer) e
 	eventCh := make(chan serf.Event, 1024)
 	h := s.serf.StartStreamEvents(eventCh, filter.Value)
 	defer s.serf.StopStreamEvents(h)
+
+	logCh := make(chan string, 1024) // TODO should it this big?
+	ls := newLogStreamer(logCh, s.logger)
+	s.logStreams.register(ls)
+	defer s.logStreams.deregister(ls)
+
+	sendStr := func(str string) (bool, error) {
+		err := stream.Send(&pb.StringValue{
+			Value: str,
+		})
+		if err != nil {
+			s.logger.Printf("[ERR] grpc-server: error sending stream %v", err)
+			if utils.ShouldStopStreaming(err) {
+				return true, err
+			}
+		}
+		return false, err
+	}
+
 	for {
 		select {
 		case <-stream.Context().Done(): // TODO: LOG TERMINATION
 			s.logger.Println("[INFO] grpc-server: stop streaming gracefully")
 			return nil
 		case e := <-eventCh:
-			err := stream.Send(&pb.StringValue{
-				Value: eventToString(e),
-			})
-			if err != nil {
-				s.logger.Printf("[ERR] grpc-server: error sending stream %v", err)
-				if utils.ShouldStopStreaming(err) {
-					return err
-				}
-				continue
+			stop, err := sendStr(eventToString(e))
+			if stop {
+				return err
+			}
+		case l := <-logCh:
+			stop, err := sendStr(l)
+			if stop {
+				return err
 			}
 		}
 	}
