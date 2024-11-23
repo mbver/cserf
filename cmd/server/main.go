@@ -26,7 +26,7 @@ func main() {
 				return
 			}
 			out.Infof("running server at %s", addr)
-			utils.WaitForTerm()
+			utils.WaitForTerm(nil)
 		},
 	}
 	cmd.Flags().StringP(FlagRpcAddr, "r", "0.0.0.0:50051", "address that grpc-server listens on")

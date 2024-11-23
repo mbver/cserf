@@ -30,6 +30,7 @@ func MonitorCommand() *cobra.Command {
 			out.Result("streaming now", nil)
 			term := make(chan struct{})
 			done := make(chan struct{})
+			stopWait := make(chan struct{})
 			outCh := make(chan string, 1024)
 			errCh := make(chan error, 1)
 			go func() {
@@ -37,7 +38,11 @@ func MonitorCommand() *cobra.Command {
 					line, err := stream.Recv()
 					if err != nil {
 						errCh <- err
-						return
+						if utils.ShouldStopStreaming(err) {
+							close(stopWait)
+							return
+						}
+						continue
 					}
 					outCh <- line.Value
 				}
@@ -55,7 +60,7 @@ func MonitorCommand() *cobra.Command {
 					}
 				}
 			}()
-			utils.WaitForTerm()
+			utils.WaitForTerm(stopWait)
 			close(term)
 			<-done
 			out.Result("streaming terminated", nil)

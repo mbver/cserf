@@ -50,8 +50,8 @@ func (m *ActionManager) getBuffer() []lGroupItem {
 		}
 		for j, item := range group.Items {
 			res[i].Items[j] = &lItem{
-				LTime: item.LTime,
-				ID:    item.ID,
+				LTime:   item.LTime,
+				Payload: item.Payload,
 			}
 		}
 	}

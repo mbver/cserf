@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	serf "github.com/mbver/cserf"
+	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/pb"
 	memberlist "github.com/mbver/mlist"
 	"google.golang.org/grpc"
@@ -224,7 +225,7 @@ func memberEventToString(e *serf.CoalescedMemberEvent) string {
 	for _, n := range e.Members {
 		buf.WriteString(fmt.Sprintf("    %s,", nodeToString(n)))
 	}
-	buf.WriteString("}")
+	buf.WriteString("\n}")
 	return buf.String()
 }
 
@@ -251,15 +252,17 @@ func (s *Server) Monitor(filter *pb.StringValue, stream pb.Serf_MonitorServer) e
 	for {
 		select {
 		case <-stream.Context().Done(): // TODO: LOG TERMINATION
-			fmt.Println("==== stop streaming")
+			fmt.Println("==== stop streaming gracefully...")
 			return nil
 		case e := <-eventCh:
 			err := stream.Send(&pb.StringValue{
 				Value: eventToString(e),
 			})
 			if err != nil { // TODO: LOG ERROR
-				fmt.Println("======== got error")
-				return err
+				if utils.ShouldStopStreaming(err) {
+					return err
+				}
+				continue
 			}
 		}
 	}
