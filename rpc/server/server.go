@@ -35,7 +35,10 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 		return cleanup, err
 	}
 	logStreams := newLogStreamManager()
-	logger := createLogger(conf.LogOutput, logStreams, conf.LogPrefix)
+	logger, err := createLogger(conf.LogOutput, logStreams, conf.LogPrefix, conf.LogLevel)
+	if err != nil {
+		return cleanup, err
+	}
 
 	serf, err := createSerf(conf, logger)
 	if err != nil {
@@ -317,13 +320,16 @@ func queryEventToString(e *serf.QueryEvent) string {
 from: %s - %s`, e.LTime, e.ID, e.Name, e.Payload, addr, e.NodeID)
 }
 
-func (s *Server) Monitor(filter *pb.StringValue, stream pb.Serf_MonitorServer) error {
+func (s *Server) Monitor(req *pb.MonitorRequest, stream pb.Serf_MonitorServer) error {
 	eventCh := make(chan serf.Event, 1024)
-	h := s.serf.StartStreamEvents(eventCh, filter.Value)
+	h := s.serf.StartStreamEvents(eventCh, req.EventFilter)
 	defer s.serf.StopStreamEvents(h)
 
 	logCh := make(chan string, 1024) // TODO should it this big?
-	ls := newLogStreamer(logCh, s.logger)
+	ls, err := newLogStreamer(logCh, req.LogLevel, s.logger)
+	if err != nil {
+		return err
+	}
 	s.logStreams.register(ls)
 	defer s.logStreams.deregister(ls)
 

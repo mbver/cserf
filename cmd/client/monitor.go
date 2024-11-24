@@ -10,6 +10,7 @@ import (
 
 const (
 	FlagEventFilter = "filter"
+	FlagLogLevel    = "level"
 )
 
 func MonitorCommand() *cobra.Command {
@@ -23,8 +24,10 @@ func MonitorCommand() *cobra.Command {
 			vp := viper.New()
 			vp.BindPFlags(cmd.Flags())
 			filter := vp.GetString(FlagEventFilter)
-			stream, cancel, err := gClient.Monitor(&pb.StringValue{
-				Value: filter,
+			level := vp.GetString(FlagLogLevel)
+			stream, cancel, err := gClient.Monitor(&pb.MonitorRequest{
+				EventFilter: filter,
+				LogLevel:    level,
 			})
 			defer cancel()
 			if err != nil {
@@ -71,5 +74,6 @@ func MonitorCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().String(FlagEventFilter, "*", "the type of events to be moninored")
+	cmd.Flags().String(FlagLogLevel, "INFO", "the minimum log level to stream")
 	return cmd
 }

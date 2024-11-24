@@ -23,21 +23,20 @@ type Config struct {
 	MinQueueDepth            int               `yaml:"min_queue_depth"`
 	ManageQueueDepthInterval time.Duration     `yaml:"manage_queue_depth_interval"`
 	DNSConfigPath            string            `yaml:"dns_config_path"`
-	Tags                     map[string]string `yaml:"tags"`
+	Tags                     map[string]string `yaml:"tags"` // only used in setting up serf. never used again
 } // TODO: broadcast timeout should inject to memberlist config
 
 func DefaultConfig() *Config {
 	return &Config{
-		LBufferSize:            512,
-		QueryTimeoutMult:       16,
-		QueryResponseSizeLimit: 1024,
-		QuerySizeLimit:         1024,
-		ActionSizeLimit:        512,
-		SnapshotPath:           "./serf.snap",
-		SnapshotMinCompactSize: 128 * 1024,
-		SnapshotDrainTimeout:   500 * time.Millisecond,
-		CoalesceInterval:       1 * time.Second,
-		// KEYRING FILE? DEFAULT? NO? OR FLAG?
+		LBufferSize:              512,
+		QueryTimeoutMult:         16,
+		QueryResponseSizeLimit:   1024,
+		QuerySizeLimit:           1024,
+		ActionSizeLimit:          512,
+		SnapshotPath:             "./serf.snap",
+		SnapshotMinCompactSize:   128 * 1024,
+		SnapshotDrainTimeout:     500 * time.Millisecond,
+		CoalesceInterval:         1 * time.Second,
 		ReapInterval:             15 * time.Second,
 		ReconnectInterval:        30 * time.Second,
 		ReconnectTimeout:         24 * time.Hour,

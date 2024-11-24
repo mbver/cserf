@@ -34,7 +34,7 @@ type SerfClient interface {
 	Rtt(ctx context.Context, in *RttRequest, opts ...grpc.CallOption) (*durationpb.Duration, error)
 	Tag(ctx context.Context, in *TagRequest, opts ...grpc.CallOption) (*Empty, error)
 	Info(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Info, error)
-	Monitor(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_MonitorClient, error)
+	Monitor(ctx context.Context, in *MonitorRequest, opts ...grpc.CallOption) (Serf_MonitorClient, error)
 }
 
 type serfClient struct {
@@ -167,7 +167,7 @@ func (c *serfClient) Info(ctx context.Context, in *Empty, opts ...grpc.CallOptio
 	return out, nil
 }
 
-func (c *serfClient) Monitor(ctx context.Context, in *StringValue, opts ...grpc.CallOption) (Serf_MonitorClient, error) {
+func (c *serfClient) Monitor(ctx context.Context, in *MonitorRequest, opts ...grpc.CallOption) (Serf_MonitorClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Serf_ServiceDesc.Streams[1], "/pb.Serf/monitor", opts...)
 	if err != nil {
 		return nil, err
@@ -214,7 +214,7 @@ type SerfServer interface {
 	Rtt(context.Context, *RttRequest) (*durationpb.Duration, error)
 	Tag(context.Context, *TagRequest) (*Empty, error)
 	Info(context.Context, *Empty) (*Info, error)
-	Monitor(*StringValue, Serf_MonitorServer) error
+	Monitor(*MonitorRequest, Serf_MonitorServer) error
 	mustEmbedUnimplementedSerfServer()
 }
 
@@ -255,7 +255,7 @@ func (UnimplementedSerfServer) Tag(context.Context, *TagRequest) (*Empty, error)
 func (UnimplementedSerfServer) Info(context.Context, *Empty) (*Info, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Info not implemented")
 }
-func (UnimplementedSerfServer) Monitor(*StringValue, Serf_MonitorServer) error {
+func (UnimplementedSerfServer) Monitor(*MonitorRequest, Serf_MonitorServer) error {
 	return status.Errorf(codes.Unimplemented, "method Monitor not implemented")
 }
 func (UnimplementedSerfServer) mustEmbedUnimplementedSerfServer() {}
@@ -473,7 +473,7 @@ func _Serf_Info_Handler(srv interface{}, ctx context.Context, dec func(interface
 }
 
 func _Serf_Monitor_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(StringValue)
+	m := new(MonitorRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

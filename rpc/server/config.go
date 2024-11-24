@@ -15,6 +15,7 @@ type ServerConfig struct {
 	RpcPort          int                `yaml:"rpc_port"`
 	LogOutput        string             `yaml:"log_output"`
 	LogPrefix        string             `yaml:"log_prefix"`
+	LogLevel         string             `yaml:"log_level"`
 	Syslog           string             `yaml:"syslog"`
 	CertPath         string             `yaml:"cert_path"`
 	KeyPath          string             `yaml:"key_path"`
@@ -30,6 +31,7 @@ func DefaultServerConfig() *ServerConfig {
 		RpcPort:          50051,
 		LogOutput:        "",
 		LogPrefix:        "",
+		LogLevel:         "INFO",
 		Syslog:           "",
 		CertPath:         "./cert.pem",
 		KeyPath:          "./priv.key",

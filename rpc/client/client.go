@@ -142,9 +142,9 @@ func (c *Client) Info(req *pb.Empty) (*pb.Info, error) {
 	return c.client.Info(ctx, req)
 }
 
-func (c *Client) Monitor(filter *pb.StringValue) (pb.Serf_MonitorClient, func(), error) {
+func (c *Client) Monitor(req *pb.MonitorRequest) (pb.Serf_MonitorClient, func(), error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	stream, err := c.client.Monitor(ctx, filter)
+	stream, err := c.client.Monitor(ctx, req)
 	if err != nil {
 		return nil, cancel, err
 	}

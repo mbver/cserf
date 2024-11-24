@@ -87,6 +87,11 @@ message Info {
     map<string, string> stats = 2;
 }
 
+message MonitorRequest {
+    string event_filter = 1;
+    string log_level = 2;
+}
+
 service Serf{
     rpc query(QueryParam) returns (stream StringValue);
     rpc key(KeyRequest) returns (KeyResponse);
@@ -99,5 +104,5 @@ service Serf{
     rpc rtt(RttRequest) returns (google.protobuf.Duration);
     rpc tag(TagRequest) returns (Empty);
     rpc info(Empty) returns (Info);
-    rpc monitor(StringValue) returns (stream StringValue);
+    rpc monitor(MonitorRequest) returns (stream StringValue);
 }

@@ -64,7 +64,7 @@ func isValidEventFilter(f *eventFilter) bool {
 	etype := f.eventType
 	return etype == "member-join" || etype == "member-leave" ||
 		etype == "member-failed" || etype == "member-update" ||
-		etype == "member-reap" || etype == "user" ||
+		etype == "member-reap" || etype == "action" ||
 		etype == "query" || etype == "*"
 }
 
@@ -351,10 +351,11 @@ func stdinPayload(logger *log.Logger, stdin io.WriteCloser, buf []byte) {
 
 func parseEventFilter(s string) (*eventFilter, error) {
 	f := &eventFilter{eventType: s}
-	if strings.HasPrefix(s, "user:") {
-		f.name = s[len("user:"):]
-		f.eventType = "user"
-	} else if strings.HasPrefix(s, "query:") {
+	if strings.HasPrefix(s, "action:") {
+		f.name = s[len("action:"):]
+		f.eventType = "action"
+	}
+	if strings.HasPrefix(s, "query:") {
 		f.name = s[len("query:"):]
 		f.eventType = "query"
 	}
@@ -407,6 +408,7 @@ func CreateScriptHandlers(s string, invokeCh chan *invokeScript) []*ScriptEventH
 
 func CreateStreamHandler(eventCh chan Event, filter string) *StreamEventHandler {
 	filters := ParseEventFilters(filter)
+	fmt.Println("====== filters:", len(filter))
 	return &StreamEventHandler{
 		eventCh: eventCh,
 		filters: filters,
