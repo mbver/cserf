@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"io"
 	"math/big"
 	"net"
 	"os"
@@ -20,8 +19,6 @@ import (
 	serf "github.com/mbver/cserf"
 	"github.com/mbver/cserf/rpc/server"
 	memberlist "github.com/mbver/mlist"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func ToTagMap(s string) map[string]string {
@@ -54,19 +51,6 @@ func WaitForTerm(stop chan struct{}) {
 		return
 
 	}
-}
-
-func ShouldStopStreaming(err error) bool {
-	st, ok := status.FromError(err)
-	if ok {
-		if st.Code() == codes.Unavailable {
-			return true
-		}
-	}
-	if err == io.EOF {
-		return true
-	}
-	return false
 }
 
 func GenerateSelfSignedCert(certfile, keyfile string) error {
@@ -171,5 +155,6 @@ func CreateTestServerConfig() (*server.ServerConfig, error) {
 	conf.LogPrefix = "serf: "
 	conf.MemberlistConfig = mconf
 	conf.SerfConfig = sconf
+	conf.EncryptKey = "T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="
 	return conf, nil
 }

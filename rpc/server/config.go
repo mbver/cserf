@@ -18,9 +18,10 @@ type ServerConfig struct {
 	Syslog           string             `yaml:"syslog"`
 	CertPath         string             `yaml:"cert_path"`
 	KeyPath          string             `yaml:"key_path"`
+	EncryptKey       string             `yaml:"encrypt_key"`
 	MemberlistConfig *memberlist.Config `yaml:"memberlist_config"`
 	SerfConfig       *serf.Config       `yaml:"serf_config"`
-	// TODO: keys, keyring, auth?
+	// TODO: auth?
 }
 
 func DefaultServerConfig() *ServerConfig {

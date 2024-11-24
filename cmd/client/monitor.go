@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/pb"
+	"github.com/mbver/cserf/rpc/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,7 +39,7 @@ func MonitorCommand() *cobra.Command {
 					line, err := stream.Recv()
 					if err != nil {
 						errCh <- err
-						if utils.ShouldStopStreaming(err) {
+						if server.ShouldStopStreaming(err) {
 							close(stopWait)
 							return
 						}
