@@ -36,12 +36,17 @@ func QueryCommand() *cobra.Command {
 			relay := vp.GetInt(FlagRelay)
 			payload := vp.GetString(FlagPayload)
 			p := toQueryParams(name, nodeStr, tagStr, timeout, relay, payload)
-			res, err := gClient.Query(p)
+
+			resCh, cancel, err := gClient.Query(p)
+			defer cancel()
+
 			if err != nil {
 				out.Error(err)
 				return
 			}
-			out.Result("query response", res)
+			for r := range resCh {
+				out.Info(r)
+			}
 		},
 	}
 	cmd.Flags().String(FlagName, "", "query name")

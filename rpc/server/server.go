@@ -137,12 +137,21 @@ func (s *Server) Query(params *pb.QueryParam, stream pb.Serf_QueryServer) error 
 		p = QueryParamFromPb(params)
 	}
 	respCh := make(chan *serf.QueryResponse)
+	numResp := 0
 	s.serf.Query(respCh, p)
 	for r := range respCh {
+		numResp++
+		n := len(r.Payload)
+		if n > 0 && r.Payload[n-1] == '\n' {
+			r.Payload = r.Payload[:n-1]
+		}
 		stream.Send(&pb.StringValue{
-			Value: r.From,
+			Value: fmt.Sprintf("response from %s: %s", r.From, r.Payload),
 		})
 	}
+	stream.Send(&pb.StringValue{
+		Value: fmt.Sprintf("total number of responses: %d", numResp),
+	})
 	return nil
 }
 

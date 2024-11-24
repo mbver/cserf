@@ -4,12 +4,11 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"io"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/mbver/cserf/rpc/pb"
+	"github.com/mbver/cserf/rpc/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -57,23 +56,28 @@ func defaultCtx() (context.Context, func()) {
 	return context.WithTimeout(context.Background(), 5*time.Second)
 }
 
-func (c *Client) Query(params *pb.QueryParam) (string, error) {
+func (c *Client) Query(params *pb.QueryParam) (chan string, func(), error) {
 	ctx, cancel := defaultCtx()
-	defer cancel()
+	respCh := make(chan string, 1024)
 	stream, err := c.client.Query(ctx, params)
 	if err != nil {
-		return "", err
+		return nil, cancel, err
 	}
-	buf := strings.Builder{}
 
-	for {
-		res, err := stream.Recv()
-		if err == io.EOF {
-			break
+	go func() {
+		defer close(respCh)
+		for {
+			res, err := stream.Recv()
+			if err != nil {
+				if server.ShouldStopStreaming(err) {
+					return
+				}
+				continue
+			}
+			respCh <- res.Value
 		}
-		buf.WriteString(res.Value)
-	}
-	return buf.String(), nil
+	}()
+	return respCh, cancel, nil
 }
 
 func (c *Client) Key(command string, key string) (*pb.KeyResponse, error) {
