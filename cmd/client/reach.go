@@ -12,6 +12,9 @@ func ReachCommand() *cobra.Command {
 		Use:   "reach",
 		Short: "test reachability of nodes in the cluster",
 		Run: func(cmd *cobra.Command, args []string) {
+			if !isSetupDone() {
+				return
+			}
 			actives, err := gClient.Active()
 			if err != nil {
 				out.Error(err)

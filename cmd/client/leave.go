@@ -10,6 +10,9 @@ func LeaveCommand() *cobra.Command {
 		Use:   "leave",
 		Short: "leave the cluster",
 		Run: func(cmd *cobra.Command, args []string) {
+			if !isSetupDone() {
+				return
+			}
 			out.Info("gonna leave, don't be clingy to me ...")
 			_, err := gClient.Leave(&pb.Empty{})
 			if err != nil {

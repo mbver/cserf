@@ -63,3 +63,7 @@ func main() {
 
 	cmd.Execute()
 }
+
+func isSetupDone() bool {
+	return gClient != nil
+}

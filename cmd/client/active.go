@@ -7,6 +7,9 @@ func ActiveCommand() *cobra.Command {
 		Use:   "active",
 		Short: "get the list of active nodes in the cluster",
 		Run: func(cmd *cobra.Command, args []string) {
+			if !isSetupDone() {
+				return
+			}
 			res, err := gClient.Active()
 			if err != nil {
 				out.Error(err)

@@ -23,6 +23,9 @@ func TagsCommand() *cobra.Command {
 		Short: "modify tags of the server's serf",
 		Long:  tagsText,
 		Run: func(cmd *cobra.Command, args []string) {
+			if !isSetupDone() {
+				return
+			}
 			if len(args) < 2 {
 				out.Error(fmt.Errorf("require at least 2 arguments"))
 				return

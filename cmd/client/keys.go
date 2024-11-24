@@ -18,6 +18,9 @@ func KeyCommand() *cobra.Command {
 		Short: "manage encryption keys in serf",
 		Long:  keyHelp,
 		Run: func(cmd *cobra.Command, args []string) {
+			if !isSetupDone() {
+				return
+			}
 			if len(args) < 1 {
 				out.Error(ErrAtLeastOneArg)
 				return
