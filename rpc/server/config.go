@@ -3,35 +3,40 @@ package server
 import (
 	"os"
 
-	"sigs.k8s.io/yaml"
+	serf "github.com/mbver/cserf"
+	memberlist "github.com/mbver/mlist"
+	"gopkg.in/yaml.v3"
 )
 
 // to nest memberlist config and serf config
 // and see how they include default config
 type ServerConfig struct {
-	RpcAddress string `yaml:"rpc_addr"`
-	RpcPort    int    `yaml:"rpc_port"`
-	BindAddr   string `yaml:"bind_addr`
-	BindPort   int    `yaml:"bind_port"`
-	LogOutput  string `yaml:"log_output"`
-	LogPrefix  string `yaml:"log_prefix"`
-	Syslog     string `yaml:"syslog"`
-	CertPath   string `yaml:"cert_path"`
-	KeyPath    string `yaml:"key_path"`
+	RpcAddress       string             `yaml:"rpc_addr"`
+	RpcPort          int                `yaml:"rpc_port"`
+	LogOutput        string             `yaml:"log_output"`
+	LogPrefix        string             `yaml:"log_prefix"`
+	Syslog           string             `yaml:"syslog"`
+	CertPath         string             `yaml:"cert_path"`
+	KeyPath          string             `yaml:"key_path"`
+	MemberlistConfig *memberlist.Config `yaml:"memberlist_config"`
+	SerfConfig       *serf.Config       `yaml:"serf_config"`
+	BindAddr         string             `yaml:"bind_addr"`
+	BindPort         int                `yaml:"bind_port"`
 	// TODO: keys, keyring, auth?
 }
 
 func DefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
-		RpcAddress: "127.0.0.1",
-		RpcPort:    50051,
-		BindAddr:   "127.0.0.10",
-		BindPort:   7946,
-		LogOutput:  "",
-		LogPrefix:  "",
-		Syslog:     "",
-		CertPath:   "./cert.pem",
-		KeyPath:    "./priv.key",
+		RpcAddress:       "127.0.0.1",
+		RpcPort:          50051,
+		LogOutput:        "",
+		LogPrefix:        "",
+		Syslog:           "",
+		CertPath:         "./cert.pem",
+		KeyPath:          "./priv.key",
+		BindAddr:         "127.0.0.10",
+		MemberlistConfig: memberlist.DefaultLANConfig(),
+		BindPort:         7946,
 	}
 }
 
@@ -41,7 +46,7 @@ func LoadConfig(path string) (*ServerConfig, error) {
 		return nil, err
 	}
 	conf := &ServerConfig{}
-	err = yaml.UnmarshalStrict(ybytes, conf)
+	err = yaml.Unmarshal(ybytes, conf)
 	if err != nil {
 		return nil, err
 	}

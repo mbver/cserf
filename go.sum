@@ -67,6 +67,8 @@ github.com/mbver/mlist v0.0.0-20241117070333-5e7b17e61007 h1:PJLlmTNA8ZgvZCjj093
 github.com/mbver/mlist v0.0.0-20241117070333-5e7b17e61007/go.mod h1:aJLdZCQSc7A6rOi7qyW9rNknsCMp0UKzcp66m2NAeNs=
 github.com/mbver/mlist v0.0.0-20241121133233-c3ee1b90fcb6 h1:AuEuu3EVHiWu6uabnrNLZpP39V6r1uR+CeH2lPXRPZI=
 github.com/mbver/mlist v0.0.0-20241121133233-c3ee1b90fcb6/go.mod h1:aJLdZCQSc7A6rOi7qyW9rNknsCMp0UKzcp66m2NAeNs=
+github.com/mbver/mlist v0.0.0-20241124044033-4ac7c5e0265e h1:cEkuJ9+1/6hXJ+LpsnymhR+tK5x5mP+MprzUaTtUeho=
+github.com/mbver/mlist v0.0.0-20241124044033-4ac7c5e0265e/go.mod h1:aJLdZCQSc7A6rOi7qyW9rNknsCMp0UKzcp66m2NAeNs=
 github.com/miekg/dns v1.1.62 h1:cN8OuEF1/x5Rq6Np+h1epln8OiyPWV+lROx9LxcGgIQ=
 github.com/miekg/dns v1.1.62/go.mod h1:mvDlcItzm+br7MToIKqkglaGhlFMHJ9DTNNWONWXbNQ=
 github.com/mitchellh/cli v1.1.5 h1:OxRIeJXpAMztws/XHlN2vu6imG5Dpq+j61AzAX5fLng=

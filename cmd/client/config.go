@@ -5,7 +5,7 @@ import (
 
 	"github.com/mbver/cserf/rpc/server"
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 func ConfigCommand() *cobra.Command {
