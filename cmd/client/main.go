@@ -20,7 +20,7 @@ func main() {
 		Use: "serf",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			name := cmd.Name()
-			if name == "keygen" || name == "config" {
+			if name == "keygen" || name == "config" || name == "cert" {
 				return
 			}
 			vp := viper.New()
@@ -59,6 +59,7 @@ func main() {
 	cmd.AddCommand(KeyGenCommand())
 	cmd.AddCommand(MonitorCommand())
 	cmd.AddCommand(ConfigCommand())
+	cmd.AddCommand(CertGenCommand())
 
 	cmd.Execute()
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/mbver/cserf/rpc/server"
@@ -37,7 +36,7 @@ func ConfigCommand() *cobra.Command {
 				out.Error(err)
 				return
 			}
-			out.Result(fmt.Sprintf("successfully write a default-server-config file to %s", path), nil)
+			out.Result("successfully write a default-server-config file to", path)
 		},
 	}
 }

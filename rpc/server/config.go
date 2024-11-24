@@ -25,13 +25,13 @@ func DefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
 		RpcAddress: "127.0.0.1",
 		RpcPort:    50051,
-		BindAddr:   "0.0.0.0",
+		BindAddr:   "127.0.0.10",
 		BindPort:   7946,
 		LogOutput:  "",
 		LogPrefix:  "",
 		Syslog:     "",
-		CertPath:   "./server.cert",
-		KeyPath:    "./key.key",
+		CertPath:   "./cert.pem",
+		KeyPath:    "./priv.key",
 	}
 }
 
