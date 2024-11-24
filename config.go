@@ -26,5 +26,23 @@ type Config struct {
 } // TODO: broadcast timeout should inject to memberlist config
 
 func DefaultConfig() *Config {
-	return &Config{}
+	return &Config{
+		LBufferSize:            512,
+		QueryTimeoutMult:       16,
+		QueryResponseSizeLimit: 1024,
+		QuerySizeLimit:         1024,
+		ActionSizeLimit:        512,
+		SnapshotPath:           "./serf.snap",
+		SnapshotMinCompactSize: 128 * 1024,
+		SnapshotDrainTimeout:   500 * time.Millisecond,
+		CoalesceInterval:       1 * time.Second,
+		// KEYRING FILE? DEFAULT? NO? OR FLAG?
+		ReapInterval:             15 * time.Second,
+		ReconnectInterval:        30 * time.Second,
+		ReconnectTimeout:         24 * time.Hour,
+		TombstoneTimeout:         24 * time.Hour,
+		MaxQueueDepth:            4096,
+		ManageQueueDepthInterval: 30 * time.Second,
+		// add a warning queue depth?
+	}
 }

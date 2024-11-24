@@ -6,13 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	serf "github.com/mbver/cserf"
-	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/pb"
 	memberlist "github.com/mbver/mlist"
 	"google.golang.org/grpc"
@@ -39,17 +36,20 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 	logStreams := newLogStreamManager()
 	logger := createLogger(conf.LogOutput, logStreams, conf.LogPrefix)
 
-	serf, cleanup, err := createSerf(conf, logger)
+	serf, err := createSerf(conf, logger)
 	if err != nil {
 		return cleanup, err
 	}
+
+	cleanup1 := CombineCleanup(cleanup, serf.Shutdown)
 
 	addr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return cleanup, err
 	}
-	cleanup1 := CombineCleanup(cleanup, func() { l.Close() })
+	cleanup2 := CombineCleanup(cleanup1, func() { l.Close() })
+
 	server := &Server{
 		serf:       serf,
 		logStreams: logStreams,
@@ -63,7 +63,7 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 			logger.Printf("[ERR] grpc-server: failed serving %v", err)
 		}
 	}()
-	return cleanup1, nil
+	return cleanup2, nil
 }
 
 func getCredentials(certPath, keyPath string) (credentials.TransportCredentials, error) {
@@ -76,8 +76,7 @@ func getCredentials(certPath, keyPath string) (credentials.TransportCredentials,
 	}), nil
 }
 
-func createSerf(conf *ServerConfig, logger *log.Logger) (*serf.Serf, func(), error) {
-	cleanup := func() {}
+func createSerf(conf *ServerConfig, logger *log.Logger) (*serf.Serf, error) {
 	b := &serf.SerfBuilder{}
 	b.WithLogger(logger)
 
@@ -85,52 +84,19 @@ func createSerf(conf *ServerConfig, logger *log.Logger) (*serf.Serf, func(), err
 	key := []byte{79, 216, 231, 114, 9, 125, 153, 178, 238, 179, 230, 218, 77, 54, 187, 171, 185, 207, 73, 74, 215, 193, 176, 226, 217, 216, 91, 182, 168, 171, 223, 187}
 	keyring, err := memberlist.NewKeyring(nil, key)
 	if err != nil {
-		return nil, cleanup, err
+		return nil, err
 	}
 
 	b.WithKeyring(keyring)
 
-	// TODO: EXTRACT FROM CONFIG
-	mconf := testMemberlistConfig()
-	mconf.BindAddr = conf.BindAddr
-	mconf.BindPort = conf.BindPort
-	mconf.Label = "label" // remove
-	b.WithMemberlistConfig(mconf)
+	b.WithMemberlistConfig(conf.MemberlistConfig)
+	b.WithConfig(conf.SerfConfig)
 
-	snapPath := tmpPath()
-	script, cleanup, err := createTestEventScript() // REMOVE
-	if err != nil {
-		return nil, cleanup, err
-	}
-	sconf := &serf.Config{ // TO EXTRACT FROM CONF
-		EventScript:            script,
-		LBufferSize:            1024,
-		QueryTimeoutMult:       16,
-		QueryResponseSizeLimit: 1024,
-		QuerySizeLimit:         1024,
-		ActionSizeLimit:        512,
-		SnapshotPath:           snapPath,
-		SnapshotMinCompactSize: 128 * 1024,
-		SnapshotDrainTimeout:   500 * time.Millisecond,
-		CoalesceInterval:       5 * time.Millisecond,
-		ReapInterval:           10 * time.Millisecond,
-		// ReconnectInterval:      1 * time.Millisecond,
-		MaxQueueDepth:    1024,
-		ReconnectTimeout: 5 * time.Millisecond,
-		TombstoneTimeout: 5 * time.Millisecond,
-	}
-	cleanup1 := CombineCleanup(cleanup, func() { // CONSIDER REMOVE
-		data, _ := os.ReadFile(sconf.SnapshotPath)
-		logger.Printf("### snapshot %s:", string(data))
-		os.Remove(sconf.SnapshotPath)
-	})
-	b.WithConfig(sconf)
 	s, err := b.Build()
 	if err != nil {
-		return nil, cleanup1, err
+		return nil, err
 	}
-	cleanup2 := CombineCleanup(s.Shutdown, cleanup1)
-	return s, cleanup2, nil
+	return s, nil
 }
 
 func (s *Server) Shutdown() {
@@ -359,7 +325,7 @@ func (s *Server) Monitor(filter *pb.StringValue, stream pb.Serf_MonitorServer) e
 		})
 		if err != nil {
 			s.logger.Printf("[ERR] grpc-server: error sending stream %v", err)
-			if utils.ShouldStopStreaming(err) {
+			if ShouldStopStreaming(err) {
 				return true, err
 			}
 		}

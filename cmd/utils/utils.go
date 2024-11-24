@@ -12,10 +12,14 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	serf "github.com/mbver/cserf"
+	"github.com/mbver/cserf/rpc/server"
+	memberlist "github.com/mbver/mlist"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -121,4 +125,51 @@ func GenerateSelfSignedCert(certfile, keyfile string) error {
 		return err
 	}
 	return nil
+}
+
+func testMemberlistConfig() *memberlist.Config {
+	conf := memberlist.DefaultLANConfig()
+	conf.PingTimeout = 20 * time.Millisecond
+	conf.ProbeInterval = 60 * time.Millisecond
+	conf.ProbeInterval = 5 * time.Millisecond
+	conf.GossipInterval = 5 * time.Millisecond
+	conf.PushPullInterval = 0
+	conf.ReapInterval = 0
+	return conf
+}
+
+func testSerfConfig() *serf.Config {
+	conf := serf.DefaultConfig()
+	conf.CoalesceInterval = 5 * time.Millisecond
+	conf.ReapInterval = 10 * time.Millisecond
+	conf.ReconnectTimeout = 5 * time.Millisecond
+	conf.TombstoneTimeout = 5 * time.Millisecond
+	return conf
+}
+
+func CreateTestEventScript(path string) error {
+	filename := filepath.Join(path, "eventscript.sh")
+	fh, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+
+	if _, err := fh.Write([]byte(`echo "Hello"`)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func CreateTestServerConfig() (*server.ServerConfig, error) {
+	mconf := testMemberlistConfig()
+	mconf.BindAddr = "127.0.0.10"
+
+	sconf := testSerfConfig()
+	conf := server.DefaultServerConfig()
+	conf.RpcAddress = "127.0.0.1"
+	conf.LogPrefix = "serf: "
+	conf.MemberlistConfig = mconf
+	conf.SerfConfig = sconf
+	return conf, nil
 }

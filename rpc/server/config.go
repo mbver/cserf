@@ -20,23 +20,20 @@ type ServerConfig struct {
 	KeyPath          string             `yaml:"key_path"`
 	MemberlistConfig *memberlist.Config `yaml:"memberlist_config"`
 	SerfConfig       *serf.Config       `yaml:"serf_config"`
-	BindAddr         string             `yaml:"bind_addr"`
-	BindPort         int                `yaml:"bind_port"`
 	// TODO: keys, keyring, auth?
 }
 
 func DefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
-		RpcAddress:       "127.0.0.1",
+		RpcAddress:       "0.0.0.0",
 		RpcPort:          50051,
 		LogOutput:        "",
 		LogPrefix:        "",
 		Syslog:           "",
 		CertPath:         "./cert.pem",
 		KeyPath:          "./priv.key",
-		BindAddr:         "127.0.0.10",
 		MemberlistConfig: memberlist.DefaultLANConfig(),
-		BindPort:         7946,
+		SerfConfig:       serf.DefaultConfig(),
 	}
 }
 

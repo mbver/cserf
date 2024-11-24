@@ -8,6 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
 	mrand "math/rand"
 	"net"
@@ -17,6 +18,8 @@ import (
 	"time"
 
 	memberlist "github.com/mbver/mlist"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func CombineCleanup(cleanups ...func()) func() {
@@ -130,4 +133,17 @@ func GenerateSelfSignedCert() (string, string, func(), error) {
 		return "", "", cleanup, err
 	}
 	return certFile, keyFile, cleanup, nil
+}
+
+func ShouldStopStreaming(err error) bool {
+	st, ok := status.FromError(err)
+	if ok {
+		if st.Code() == codes.Unavailable {
+			return true
+		}
+	}
+	if err == io.EOF {
+		return true
+	}
+	return false
 }
