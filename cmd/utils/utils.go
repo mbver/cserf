@@ -128,6 +128,7 @@ func testSerfConfig() *serf.Config {
 	conf.ReapInterval = 10 * time.Millisecond
 	conf.ReconnectTimeout = 5 * time.Millisecond
 	conf.TombstoneTimeout = 5 * time.Millisecond
+	conf.Tags = map[string]string{"role": "something"}
 	return conf
 }
 

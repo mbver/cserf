@@ -209,9 +209,9 @@ func testNode(opts *testNodeOpts) (*Serf, func(), error) {
 
 	b.WithConfig(conf)
 
-	b.WithTags(opts.tags)
-
 	b.WithPingDelegate(opts.ping)
+
+	b.conf.Tags = opts.tags
 
 	s, err := b.Build()
 	if err != nil {

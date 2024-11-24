@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	FlagRpcAddr = "rpc-addr"
-	FlagConfig  = "conf"
+	FlagConfig = "conf"
 )
 
 var out = utils.DefaultOutput()

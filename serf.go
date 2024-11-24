@@ -66,7 +66,6 @@ type SerfBuilder struct {
 	conf    *Config
 	keyring *memberlist.Keyring
 	logger  *log.Logger
-	tags    map[string]string
 	ping    PingDelegate
 }
 
@@ -84,10 +83,6 @@ func (b *SerfBuilder) WithKeyring(k *memberlist.Keyring) {
 
 func (b *SerfBuilder) WithLogger(l *log.Logger) {
 	b.logger = l
-}
-
-func (b *SerfBuilder) WithTags(tags map[string]string) {
-	b.tags = tags
 }
 
 func (b *SerfBuilder) WithPingDelegate(p PingDelegate) {
@@ -134,6 +129,17 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 	scriptHandlers := CreateScriptHandlers(s.config.EventScript, s.invokeScriptCh)
 	s.eventHandlers.script.update(scriptHandlers)
 
+	s.tags = make(map[string]string)
+	if b.conf.Tags != nil {
+		s.tags = b.conf.Tags
+	}
+
+	mtags, err := encodeTags(s.tags)
+	if err != nil {
+		return nil, err
+	}
+	b.mconf.Tags = mtags
+
 	mbuilder := &memberlist.MemberlistBuilder{}
 	mbuilder.WithConfig(b.mconf)
 	mbuilder.WithLogger(b.logger)
@@ -179,19 +185,6 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 		s.inactive.addLeftBatch,
 	)
 	mbuilder.WithUserStateDelegate(s.usrState)
-
-	s.tags = make(map[string]string)
-	if len(b.tags) != 0 {
-		encoded, err := encodeTags(b.tags)
-		if len(encoded) > memberlist.TagMaxSize {
-			return nil, memberlist.ErrMaxTagSizeExceed
-		}
-		if err != nil {
-			return nil, err
-		}
-		b.mconf.Tags = encoded
-		s.tags = b.tags
-	}
 
 	m, err := mbuilder.Build()
 	if err != nil {
