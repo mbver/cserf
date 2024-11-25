@@ -26,6 +26,7 @@ type ServerConfig struct {
 	ClusterName      string             `yaml:"cluster_name"`
 	NetInterface     string             `yaml:"net_interface"` // iface has to be valid or empty
 	IgnoreOld        bool               `yaml:"ignore_old"`
+	StartJoin        []string           `yaml:"start_join"`
 	MemberlistConfig *memberlist.Config `yaml:"memberlist_config"`
 	SerfConfig       *serf.Config       `yaml:"serf_config"`
 	// TODO: auth?

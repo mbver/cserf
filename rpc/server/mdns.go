@@ -56,13 +56,16 @@ func NewClusterMDNS(
 		return nil, err
 	}
 
+	addr := net.JoinHostPort(ip.String(), strconv.Itoa(int(port)))
 	m := &ClusterMDNS{
 		serf:        serf,
 		clusterName: clusterName,
 		logger:      logger,
-		seen:        map[string]struct{}{},
-		ignoreOld:   ignoreOld,
-		iface:       iface,
+		seen: map[string]struct{}{
+			addr: {}, // don't join ourselves
+		},
+		ignoreOld: ignoreOld,
+		iface:     iface,
 	}
 	go m.run()
 	return m, nil

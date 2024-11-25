@@ -149,6 +149,9 @@ func createSerf(conf *ServerConfig, logger *log.Logger) (*serf.Serf, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(conf.StartJoin) > 0 {
+		s.Join(conf.StartJoin, conf.IgnoreOld)
+	}
 	return s, nil
 }
 
