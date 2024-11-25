@@ -72,6 +72,16 @@ func getIface(name string) (*net.Interface, error) {
 	return net.InterfaceByName(name)
 }
 
+func extractIP(addr net.Addr) (net.IP, bool) {
+	switch addr := addr.(type) {
+	case *net.IPAddr:
+		return addr.IP, true
+	case *net.IPNet:
+		return addr.IP, true
+	}
+	return nil, false
+}
+
 func bindIface(name string, addr string) (string, error) {
 	iface, _ := getIface(name)
 	if iface == nil {
@@ -84,11 +94,11 @@ func bindIface(name string, addr string) (string, error) {
 	if addr != "0.0.0.0" {
 		found := false
 		for _, a := range addrs {
-			ipNet, ok := a.(*net.IPNet)
+			ip, ok := extractIP(a)
 			if !ok {
 				continue
 			}
-			if ipNet.IP.String() == addr {
+			if ip.String() == addr {
 				found = true
 				break
 			}
@@ -101,12 +111,8 @@ func bindIface(name string, addr string) (string, error) {
 	found := false
 	var ip net.IP
 	for _, a := range addrs {
-		switch addr := a.(type) {
-		case *net.IPAddr:
-			ip = addr.IP
-		case *net.IPNet:
-			ip = addr.IP
-		default:
+		ip, ok := extractIP(a)
+		if !ok {
 			continue
 		}
 		if ip.IsLinkLocalUnicast() {
