@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+	"net"
 	"os"
 
 	serf "github.com/mbver/cserf"
@@ -22,7 +24,7 @@ type ServerConfig struct {
 	EncryptKey       string             `yaml:"encrypt_key"`
 	AuthKey          string             `yaml:"auth_key"`
 	ClusterName      string             `yaml:"cluster_name"`
-	NetInterface     string             `yaml:"net_interface"`
+	NetInterface     string             `yaml:"net_interface"` // iface has to be valid or empty
 	IgnoreOld        bool               `yaml:"ignore_old"`
 	MemberlistConfig *memberlist.Config `yaml:"memberlist_config"`
 	SerfConfig       *serf.Config       `yaml:"serf_config"`
@@ -54,5 +56,67 @@ func LoadConfig(path string) (*ServerConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+	bindAddr, err := bindIface(conf.NetInterface, conf.MemberlistConfig.BindAddr)
+	if err != nil {
+		return nil, err
+	}
+	conf.MemberlistConfig.BindAddr = bindAddr
+
 	return conf, nil
+}
+
+func getIface(name string) (*net.Interface, error) {
+	if name == "" {
+		return nil, nil
+	}
+	return net.InterfaceByName(name)
+}
+
+func bindIface(name string, addr string) (string, error) {
+	iface, _ := getIface(name)
+	if iface == nil {
+		return addr, nil
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return "", err
+	}
+	if addr != "0.0.0.0" {
+		found := false
+		for _, a := range addrs {
+			ipNet, ok := a.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			if ipNet.IP.String() == addr {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return "", fmt.Errorf("interface %s has no address %s", name, addr)
+		}
+		return addr, nil
+	}
+	found := false
+	var ip net.IP
+	for _, a := range addrs {
+		switch addr := a.(type) {
+		case *net.IPAddr:
+			ip = addr.IP
+		case *net.IPNet:
+			ip = addr.IP
+		default:
+			continue
+		}
+		if ip.IsLinkLocalUnicast() {
+			continue
+		}
+		found = true
+		break
+	}
+	if !found {
+		return addr, fmt.Errorf("no address for 0.0.0.0 on iface %s", name)
+	}
+	return ip.String(), nil
 }

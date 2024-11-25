@@ -79,7 +79,7 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 
 	// start mdns service
 	if conf.ClusterName != "" {
-		iface, _ := net.InterfaceByName(conf.NetInterface) // don't care about error?
+		iface, _ := getIface(conf.NetInterface)
 		_, err = NewClusterMDNS(serf, conf.ClusterName, logger, conf.IgnoreOld, iface)
 		if err != nil {
 			return nil, err
