@@ -374,6 +374,10 @@ func (s *Serf) AdvertiseAddress() (string, error) {
 	return fmt.Sprintf("%s:%d", ip.String(), port), err
 }
 
+func (s *Serf) AdvertiseIpPort() (net.IP, uint16, error) {
+	return s.mlist.GetAdvertiseAddr()
+}
+
 func (s *Serf) ID() string {
 	return s.mlist.ID()
 }

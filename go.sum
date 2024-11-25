@@ -36,6 +36,8 @@ github.com/mbver/heap v0.0.0-20241007110110-d59c4b01d442 h1:vWUiufZn4NF93waSLM12
 github.com/mbver/heap v0.0.0-20241007110110-d59c4b01d442/go.mod h1:UXpEPhzoZp9GVfNgPNkw8NBZYk9SvIGZQYiavvi50Xc=
 github.com/mbver/mlist v0.0.0-20241124044033-4ac7c5e0265e h1:cEkuJ9+1/6hXJ+LpsnymhR+tK5x5mP+MprzUaTtUeho=
 github.com/mbver/mlist v0.0.0-20241124044033-4ac7c5e0265e/go.mod h1:aJLdZCQSc7A6rOi7qyW9rNknsCMp0UKzcp66m2NAeNs=
+github.com/mbver/mmdns v0.0.0-20240710115102-12a2c9be617a h1:sr3DRT35TRdzhSmlsspAd+ViHYgYdo9lbxvaVEEOVF0=
+github.com/mbver/mmdns v0.0.0-20240710115102-12a2c9be617a/go.mod h1:yfCVhtWP9ysBVItML8LY8IY7PyfjD/SLdoiUrXTqW8k=
 github.com/miekg/dns v1.1.62 h1:cN8OuEF1/x5Rq6Np+h1epln8OiyPWV+lROx9LxcGgIQ=
 github.com/miekg/dns v1.1.62/go.mod h1:mvDlcItzm+br7MToIKqkglaGhlFMHJ9DTNNWONWXbNQ=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=

@@ -77,6 +77,15 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 
 	cleanup1 := CombineCleanup(cleanup, serf.Shutdown)
 
+	// start mdns service
+	if conf.ClusterName != "" {
+		iface, _ := net.InterfaceByName(conf.NetInterface) // don't care about error?
+		_, err = NewClusterMDNS(serf, conf.ClusterName, logger, conf.IgnoreOld, iface)
+		if err != nil {
+			return nil, err
+		}
+	}
+	// start gprc server
 	addr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
 	l, err := net.Listen("tcp", addr)
 	if err != nil {

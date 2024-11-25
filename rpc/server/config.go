@@ -21,6 +21,9 @@ type ServerConfig struct {
 	KeyPath          string             `yaml:"key_path"`
 	EncryptKey       string             `yaml:"encrypt_key"`
 	AuthKey          string             `yaml:"auth_key"`
+	ClusterName      string             `yaml:"cluster_name"`
+	NetInterface     string             `yaml:"net_interface"`
+	IgnoreOld        bool               `yaml:"ignore_old"`
 	MemberlistConfig *memberlist.Config `yaml:"memberlist_config"`
 	SerfConfig       *serf.Config       `yaml:"serf_config"`
 	// TODO: auth?

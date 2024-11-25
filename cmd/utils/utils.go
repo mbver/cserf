@@ -158,5 +158,6 @@ func CreateTestServerConfig() (*server.ServerConfig, error) {
 	conf.SerfConfig = sconf
 	conf.EncryptKey = "T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="
 	conf.AuthKey = "st@rship"
+	conf.ClusterName = "sparrow"
 	return conf, nil
 }
