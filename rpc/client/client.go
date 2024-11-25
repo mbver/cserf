@@ -42,10 +42,15 @@ func CreateClient(addr string, certPath string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{
+	client := &Client{
 		client: pb.NewSerfClient(conn),
 		conn:   conn,
-	}, nil
+	}
+	_, err = client.Connect(&pb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 func (c *Client) Close() {
@@ -54,6 +59,12 @@ func (c *Client) Close() {
 
 func defaultCtx() (context.Context, func()) {
 	return context.WithTimeout(context.Background(), 5*time.Second)
+}
+
+func (c *Client) Connect(req *pb.Empty) (*pb.Empty, error) {
+	ctx, cancel := defaultCtx()
+	defer cancel()
+	return c.client.Connect(ctx, req)
 }
 
 func (c *Client) Query(params *pb.QueryParam) (chan string, func(), error) {

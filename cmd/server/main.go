@@ -13,7 +13,6 @@ const (
 
 var out = utils.DefaultOutput()
 
-// TODO: read config from files or flag. don't use testutils anymore!
 func main() {
 	cmd := &cobra.Command{
 		Use:   "server",

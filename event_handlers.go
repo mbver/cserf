@@ -408,7 +408,6 @@ func CreateScriptHandlers(s string, invokeCh chan *invokeScript) []*ScriptEventH
 
 func CreateStreamHandler(eventCh chan Event, filter string) *StreamEventHandler {
 	filters := ParseEventFilters(filter)
-	fmt.Println("====== filters:", len(filter))
 	return &StreamEventHandler{
 		eventCh: eventCh,
 		filters: filters,

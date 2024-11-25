@@ -16,7 +16,7 @@ type ServerConfig struct {
 	LogOutput        string             `yaml:"log_output"`
 	LogPrefix        string             `yaml:"log_prefix"`
 	LogLevel         string             `yaml:"log_level"`
-	Syslog           string             `yaml:"syslog"`
+	SyslogFacility   string             `yaml:"syslog_facility"`
 	CertPath         string             `yaml:"cert_path"`
 	KeyPath          string             `yaml:"key_path"`
 	EncryptKey       string             `yaml:"encrypt_key"`
@@ -32,7 +32,7 @@ func DefaultServerConfig() *ServerConfig {
 		LogOutput:        "",
 		LogPrefix:        "",
 		LogLevel:         "INFO",
-		Syslog:           "",
+		SyslogFacility:   "",
 		CertPath:         "./cert.pem",
 		KeyPath:          "./priv.key",
 		MemberlistConfig: memberlist.DefaultLANConfig(),

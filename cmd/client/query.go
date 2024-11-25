@@ -24,9 +24,6 @@ func QueryCommand() *cobra.Command {
 		Use:   "query",
 		Short: "run a query over all nodes in the cluster",
 		Run: func(cmd *cobra.Command, args []string) {
-			if !isSetupDone() {
-				return
-			}
 			vp := viper.New()
 			vp.BindPFlags(cmd.Flags())
 			name := vp.GetString(FlagName)

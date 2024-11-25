@@ -23,6 +23,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SerfClient interface {
+	Connect(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	Query(ctx context.Context, in *QueryParam, opts ...grpc.CallOption) (Serf_QueryClient, error)
 	Key(ctx context.Context, in *KeyRequest, opts ...grpc.CallOption) (*KeyResponse, error)
 	Action(ctx context.Context, in *ActionRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -43,6 +44,15 @@ type serfClient struct {
 
 func NewSerfClient(cc grpc.ClientConnInterface) SerfClient {
 	return &serfClient{cc}
+}
+
+func (c *serfClient) Connect(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/pb.Serf/connect", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *serfClient) Query(ctx context.Context, in *QueryParam, opts ...grpc.CallOption) (Serf_QueryClient, error) {
@@ -203,6 +213,7 @@ func (x *serfMonitorClient) Recv() (*StringValue, error) {
 // All implementations must embed UnimplementedSerfServer
 // for forward compatibility
 type SerfServer interface {
+	Connect(context.Context, *Empty) (*Empty, error)
 	Query(*QueryParam, Serf_QueryServer) error
 	Key(context.Context, *KeyRequest) (*KeyResponse, error)
 	Action(context.Context, *ActionRequest) (*Empty, error)
@@ -222,6 +233,9 @@ type SerfServer interface {
 type UnimplementedSerfServer struct {
 }
 
+func (UnimplementedSerfServer) Connect(context.Context, *Empty) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Connect not implemented")
+}
 func (UnimplementedSerfServer) Query(*QueryParam, Serf_QueryServer) error {
 	return status.Errorf(codes.Unimplemented, "method Query not implemented")
 }
@@ -269,6 +283,24 @@ type UnsafeSerfServer interface {
 
 func RegisterSerfServer(s grpc.ServiceRegistrar, srv SerfServer) {
 	s.RegisterService(&Serf_ServiceDesc, srv)
+}
+
+func _Serf_Connect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerfServer).Connect(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Serf/connect",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerfServer).Connect(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Serf_Query_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -500,6 +532,10 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "pb.Serf",
 	HandlerType: (*SerfServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "connect",
+			Handler:    _Serf_Connect_Handler,
+		},
 		{
 			MethodName: "key",
 			Handler:    _Serf_Key_Handler,

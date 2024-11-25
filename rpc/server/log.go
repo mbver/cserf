@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	gsyslog "github.com/hashicorp/go-syslog"
 	"github.com/hashicorp/logutils"
 )
 
@@ -111,6 +113,44 @@ func (m *logStreamManager) Write(p []byte) (n int, err error) {
 	return
 }
 
+var syslogPriorityMap = map[string]gsyslog.Priority{
+	"TRACE": gsyslog.LOG_DEBUG,
+	"DEBUG": gsyslog.LOG_INFO,
+	"INFO":  gsyslog.LOG_NOTICE,
+	"WARN":  gsyslog.LOG_WARNING,
+	"ERR":   gsyslog.LOG_ERR,
+	"CRIT":  gsyslog.LOG_CRIT,
+}
+
+type Syslog struct {
+	logger gsyslog.Syslogger
+}
+
+// Write is used to implement io.Writer
+func (s *Syslog) Write(p []byte) (int, error) {
+	// Extract log level
+	var level string
+	afterLevel := p
+	x := bytes.IndexByte(p, '[')
+	if x >= 0 {
+		y := bytes.IndexByte(p[x:], ']')
+		if y >= 0 {
+			level = string(p[x+1 : x+y])
+			afterLevel = p[x+y+2:]
+		}
+	}
+
+	// Each log level will be handled by a specific syslog priority
+	priority, ok := syslogPriorityMap[level]
+	if !ok {
+		priority = gsyslog.LOG_NOTICE
+	}
+
+	// Attempt the write
+	err := s.logger.WriteLevel(priority, afterLevel)
+	return len(p), err
+}
+
 const (
 	LogOutputStdout = "stdout"
 	LogOutputStderr = "stderr"
@@ -124,12 +164,12 @@ func getLogOutput(s string) io.Writer {
 	return os.Stderr
 }
 
-// TODO: add level and syslog later
 func createLogger(
 	outputConfig string,
 	streamer *logStreamManager,
 	prefix string,
 	levelStr string,
+	syslogFacility string,
 ) (*log.Logger, error) {
 	level := logutils.LogLevel(strings.ToUpper(levelStr))
 	if !isValidLevel(level) {
@@ -142,8 +182,24 @@ func createLogger(
 		MinLevel: level,
 		Writer:   output,
 	}
-	// use a slice of io.Writer and spread it out later
+
 	fanOutOutput := io.MultiWriter(filterOutput, streamer)
+
+	if syslogFacility != "" {
+		logger, err := gsyslog.NewLogger(gsyslog.LOG_NOTICE, syslogFacility, "serf")
+		if err != nil {
+			return nil, err
+		}
+		syslog := &Syslog{logger}
+		filterSyslog := &logutils.LevelFilter{
+			Levels:   LogLevels,
+			MinLevel: level,
+			Writer:   syslog,
+		}
+		fanOutOutput = io.MultiWriter(filterOutput, filterSyslog, streamer)
+	}
+
+	// use a slice of io.Writer and spread it out later
 	return log.New(fanOutOutput, prefix, log.LstdFlags), nil
 }
 

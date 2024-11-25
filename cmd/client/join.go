@@ -19,9 +19,6 @@ func JoinCommand() *cobra.Command {
 		Use:   "join",
 		Short: "join existing nodes in cluster",
 		Run: func(cmd *cobra.Command, args []string) {
-			if !isSetupDone() {
-				return
-			}
 			vp := viper.New()
 			vp.BindPFlags(cmd.Flags())
 			addrStr := vp.GetString(FlagAddrs)

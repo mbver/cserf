@@ -93,6 +93,7 @@ message MonitorRequest {
 }
 
 service Serf{
+    rpc connect(Empty) returns (Empty);
     rpc query(QueryParam) returns (stream StringValue);
     rpc key(KeyRequest) returns (KeyResponse);
     rpc action(ActionRequest) returns (Empty);

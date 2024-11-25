@@ -35,7 +35,13 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 		return cleanup, err
 	}
 	logStreams := newLogStreamManager()
-	logger, err := createLogger(conf.LogOutput, logStreams, conf.LogPrefix, conf.LogLevel)
+	logger, err := createLogger(
+		conf.LogOutput,
+		logStreams,
+		conf.LogPrefix,
+		conf.LogLevel,
+		conf.SyslogFacility,
+	)
 	if err != nil {
 		return cleanup, err
 	}
@@ -112,6 +118,10 @@ func createSerf(conf *ServerConfig, logger *log.Logger) (*serf.Serf, error) {
 
 func (s *Server) Shutdown() {
 	s.serf.Shutdown()
+}
+
+func (s *Server) Connect(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+	return &pb.Empty{}, nil
 }
 
 func QueryParamFromPb(params *pb.QueryParam) *serf.QueryParam {

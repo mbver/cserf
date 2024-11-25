@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/client"
 	"github.com/spf13/cobra"
@@ -29,11 +31,11 @@ func main() {
 			cert := vp.GetString(FlagCertPath)
 			var err error
 			gClient, err = client.CreateClient(addr, cert)
-			out.Infof("connected to server at %s", addr)
 			if err != nil {
 				out.Error(err)
-				return
+				os.Exit(1)
 			}
+			out.Infof("connected to server at %s", addr)
 		},
 		PersistentPostRun: func(cmd *cobra.Command, args []string) {
 			if gClient != nil {
@@ -62,8 +64,4 @@ func main() {
 	cmd.AddCommand(CertGenCommand())
 
 	cmd.Execute()
-}
-
-func isSetupDone() bool {
-	return gClient != nil
 }
