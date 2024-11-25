@@ -22,7 +22,7 @@ type ServerConfig struct {
 	CertPath         string             `yaml:"cert_path"`
 	KeyPath          string             `yaml:"key_path"`
 	EncryptKey       string             `yaml:"encrypt_key"`
-	AuthKey          string             `yaml:"auth_key"`
+	AuthKeyHash      string             `yaml:"auth_key_hash"`
 	ClusterName      string             `yaml:"cluster_name"`
 	NetInterface     string             `yaml:"net_interface"` // iface has to be valid or empty
 	IgnoreOld        bool               `yaml:"ignore_old"`

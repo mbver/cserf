@@ -28,7 +28,7 @@ type Server struct {
 	logger     *log.Logger
 }
 
-func authInterceptor(authkey string) grpc.UnaryServerInterceptor {
+func authInterceptor(authKeyHash string) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req interface{},
@@ -39,7 +39,8 @@ func authInterceptor(authkey string) grpc.UnaryServerInterceptor {
 		if !ok {
 			return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
 		}
-		if keys := meta["authkey"]; len(keys) == 0 || keys[0] != authkey {
+		keys := meta["authkey"]
+		if len(keys) == 0 || !ComparePwdAndHash(keys[0], authKeyHash) {
 			return nil, status.Errorf(codes.Unauthenticated, "invalid authkey")
 		}
 		return handler(ctx, req)
@@ -51,7 +52,7 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 	if conf == nil {
 		return cleanup, fmt.Errorf("nil config")
 	}
-	if conf.AuthKey == "" {
+	if conf.AuthKeyHash == "" {
 		return cleanup, fmt.Errorf("empty authkey")
 	}
 	creds, err := getCredentials(conf.CertPath, conf.KeyPath)
@@ -100,7 +101,7 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 	}
 	s := grpc.NewServer(
 		grpc.Creds(creds),
-		grpc.UnaryInterceptor(authInterceptor(conf.AuthKey)),
+		grpc.UnaryInterceptor(authInterceptor(conf.AuthKeyHash)),
 	)
 	pb.RegisterSerfServer(s, server)
 

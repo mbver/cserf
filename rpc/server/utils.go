@@ -3,6 +3,7 @@ package server
 import (
 	"io"
 
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -26,4 +27,19 @@ func ShouldStopStreaming(err error) bool {
 		return true
 	}
 	return false
+}
+
+func HashPwd(pwd string) (string, error) {
+	hbytes, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hbytes), nil
+}
+
+func ComparePwdAndHash(pwd, hash string) bool {
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(pwd)); err != nil {
+		return false
+	}
+	return true
 }
