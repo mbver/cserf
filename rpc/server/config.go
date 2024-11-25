@@ -91,38 +91,29 @@ func bindIface(name string, addr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if addr != "0.0.0.0" {
-		found := false
-		for _, a := range addrs {
-			ip, ok := extractIP(a)
-			if !ok {
-				continue
-			}
-			if ip.String() == addr {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return "", fmt.Errorf("interface %s has no address %s", name, addr)
-		}
-		return addr, nil
-	}
+	anyIsFine := addr == "0.0.0.0"
 	found := false
-	var ip net.IP
 	for _, a := range addrs {
 		ip, ok := extractIP(a)
 		if !ok {
 			continue
 		}
-		if ip.IsLinkLocalUnicast() {
-			continue
+		if anyIsFine {
+			if ip.IsLinkLocalUnicast() {
+				continue
+			}
+			addr = ip.String()
+			found = true
+			break
 		}
-		found = true
-		break
+		if ip.String() == addr {
+			found = true
+			break
+		}
 	}
 	if !found {
-		return addr, fmt.Errorf("no address for 0.0.0.0 on iface %s", name)
+		return "", fmt.Errorf("interface %s has no address %s", name, addr)
 	}
-	return ip.String(), nil
+	return addr, nil
+
 }
