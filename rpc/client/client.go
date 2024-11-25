@@ -14,6 +14,23 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
+type authKeyCredendial struct {
+	authKey string
+}
+
+func (a *authKeyCredendial) RequireTransportSecurity() bool {
+	return true
+}
+
+func (a *authKeyCredendial) GetRequestMetadata(
+	ctx context.Context,
+	uri ...string,
+) (map[string]string, error) {
+	return map[string]string{
+		"authkey": a.authKey,
+	}, nil
+}
+
 // TODO: a logger then?
 type Client struct {
 	client pb.SerfClient
@@ -33,12 +50,16 @@ func getClientCredentials(certPath string) (credentials.TransportCredentials, er
 	return creds, nil
 }
 
-func CreateClient(addr string, certPath string) (*Client, error) {
+func CreateClient(addr string, certPath string, authKey string) (*Client, error) {
 	creds, err := getClientCredentials(certPath)
 	if err != nil {
 		return nil, err
 	}
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
+	conn, err := grpc.NewClient(
+		addr,
+		grpc.WithTransportCredentials(creds),
+		grpc.WithPerRPCCredentials(&authKeyCredendial{authKey: authKey}),
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -14,7 +14,10 @@ import (
 	"github.com/mbver/cserf/rpc/pb"
 	memberlist "github.com/mbver/mlist"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -25,10 +28,31 @@ type Server struct {
 	logger     *log.Logger
 }
 
+func authInterceptor(authkey string) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req interface{},
+		_ *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (interface{}, error) {
+		meta, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
+		}
+		if keys := meta["authkey"]; len(keys) == 0 || keys[0] != authkey {
+			return nil, status.Errorf(codes.Unauthenticated, "invalid authkey")
+		}
+		return handler(ctx, req)
+	}
+}
+
 func CreateServer(conf *ServerConfig) (func(), error) {
 	cleanup := func() {}
 	if conf == nil {
 		return cleanup, fmt.Errorf("nil config")
+	}
+	if conf.AuthKey == "" {
+		return cleanup, fmt.Errorf("empty authkey")
 	}
 	creds, err := getCredentials(conf.CertPath, conf.KeyPath)
 	if err != nil {
@@ -65,7 +89,10 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 		logStreams: logStreams,
 		logger:     logger,
 	}
-	s := grpc.NewServer(grpc.Creds(creds))
+	s := grpc.NewServer(
+		grpc.Creds(creds),
+		grpc.UnaryInterceptor(authInterceptor(conf.AuthKey)),
+	)
 	pb.RegisterSerfServer(s, server)
 
 	go func() {

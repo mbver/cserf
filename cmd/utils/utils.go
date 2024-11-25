@@ -157,5 +157,6 @@ func CreateTestServerConfig() (*server.ServerConfig, error) {
 	conf.MemberlistConfig = mconf
 	conf.SerfConfig = sconf
 	conf.EncryptKey = "T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="
+	conf.AuthKey = "st@rship"
 	return conf, nil
 }

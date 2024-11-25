@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/mbver/cserf/cmd/utils"
@@ -29,8 +30,13 @@ func main() {
 			vp.BindPFlags(cmd.Flags())
 			addr := vp.GetString(FlagRpcAddr)
 			cert := vp.GetString(FlagCertPath)
+			authKey := os.Getenv("SERF_RPC_AUTH")
+			if authKey == "" {
+				out.Error(fmt.Errorf("no auth key"))
+				os.Exit(1)
+			}
 			var err error
-			gClient, err = client.CreateClient(addr, cert)
+			gClient, err = client.CreateClient(addr, cert, authKey)
 			if err != nil {
 				out.Error(err)
 				os.Exit(1)

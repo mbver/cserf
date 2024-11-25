@@ -20,6 +20,7 @@ type ServerConfig struct {
 	CertPath         string             `yaml:"cert_path"`
 	KeyPath          string             `yaml:"key_path"`
 	EncryptKey       string             `yaml:"encrypt_key"`
+	AuthKey          string             `yaml:"auth_key"`
 	MemberlistConfig *memberlist.Config `yaml:"memberlist_config"`
 	SerfConfig       *serf.Config       `yaml:"serf_config"`
 	// TODO: auth?
