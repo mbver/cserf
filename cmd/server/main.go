@@ -26,7 +26,7 @@ func main() {
 				return
 			}
 
-			cleanup1, err := server.CreateServer(conf)
+			_, cleanup1, err := server.CreateServer(conf)
 			defer cleanup1()
 			if err != nil {
 				out.Error(err)

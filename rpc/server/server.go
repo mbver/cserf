@@ -47,17 +47,17 @@ func authInterceptor(authKeyHash string) grpc.UnaryServerInterceptor {
 	}
 }
 
-func CreateServer(conf *ServerConfig) (func(), error) {
+func CreateServer(conf *ServerConfig) (*Server, func(), error) {
 	cleanup := func() {}
 	if conf == nil {
-		return cleanup, fmt.Errorf("nil config")
+		return nil, cleanup, fmt.Errorf("nil config")
 	}
 	if conf.AuthKeyHash == "" {
-		return cleanup, fmt.Errorf("empty authkey")
+		return nil, cleanup, fmt.Errorf("empty authkey")
 	}
 	creds, err := getCredentials(conf.CertPath, conf.KeyPath)
 	if err != nil {
-		return cleanup, err
+		return nil, cleanup, err
 	}
 	logStreams := newLogStreamManager()
 	logger, err := createLogger(
@@ -68,12 +68,12 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 		conf.SyslogFacility,
 	)
 	if err != nil {
-		return cleanup, err
+		return nil, cleanup, err
 	}
 
 	serf, err := createSerf(conf, logger)
 	if err != nil {
-		return cleanup, err
+		return nil, cleanup, err
 	}
 
 	cleanup = serf.Shutdown
@@ -83,14 +83,14 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 		iface, _ := getIface(conf.NetInterface)
 		_, err = NewClusterMDNS(serf, conf.ClusterName, logger, conf.IgnoreOld, iface)
 		if err != nil {
-			return nil, err
+			return nil, cleanup, err
 		}
 	}
 	// start gprc server
 	addr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		return cleanup, err
+		return nil, cleanup, err
 	}
 	cleanup1 := CombineCleanup(func() { l.Close() }, cleanup)
 
@@ -110,7 +110,7 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 			logger.Printf("[ERR] grpc-server: failed serving %v", err)
 		}
 	}()
-	return cleanup2, nil
+	return server, cleanup2, nil
 }
 
 func getCredentials(certPath, keyPath string) (credentials.TransportCredentials, error) {
@@ -154,6 +154,14 @@ func createSerf(conf *ServerConfig, logger *log.Logger) (*serf.Serf, error) {
 		s.Join(conf.StartJoin, conf.IgnoreOld)
 	}
 	return s, nil
+}
+
+func (s *Server) ID() string {
+	return s.serf.ID()
+}
+
+func (s *Server) SerfAddress() (string, error) {
+	return s.serf.AdvertiseAddress()
 }
 
 func (s *Server) Shutdown() {

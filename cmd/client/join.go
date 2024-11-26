@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/pb"
@@ -11,24 +10,21 @@ import (
 )
 
 const (
-	FlagAddrs     = "addrs"
 	FlagIngoreOld = "ignore-old"
 )
 
 func JoinCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "join",
+		Use:   "join <addr1> <addr2> <addrN>",
 		Short: "join existing nodes in cluster",
 		Run: func(cmd *cobra.Command, args []string) {
 			out := utils.CreateOutputFromCmd(cmd)
-			vp := viper.New()
-			vp.BindPFlags(cmd.Flags())
-			addrStr := vp.GetString(FlagAddrs)
-			if len(addrStr) == 0 {
-				out.Error(fmt.Errorf("no node to join"))
+			if len(args) < 1 {
+				out.Error(ErrAtLeastOneArg)
 				return
 			}
-			addrs := strings.Split(addrStr, ",")
+			vp := viper.New()
+			vp.BindPFlags(cmd.Flags())
 			ignoreOld := vp.GetBool(FlagIngoreOld)
 
 			gClient, err := getClientFromCmd(cmd)
@@ -41,7 +37,7 @@ func JoinCommand() *cobra.Command {
 				gClient.Close()
 				out.Info("client closed")
 			}()
-
+			addrs := args[:]
 			res, err := gClient.Join(&pb.JoinRequest{
 				Addrs:     addrs,
 				IgnoreOld: ignoreOld,
@@ -58,7 +54,6 @@ func JoinCommand() *cobra.Command {
 	}
 	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
 	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
-	cmd.Flags().String(FlagAddrs, "", `list of existing nodes' addresses to join, separated by ","`)
 	cmd.Flags().Bool(FlagIngoreOld, false, "ignore old events from existing nodes while joining")
 	return cmd
 }
