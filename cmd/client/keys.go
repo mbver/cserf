@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/mbver/cserf/cmd/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +19,7 @@ func KeyCommand() *cobra.Command {
 		Short: "manage encryption keys in serf",
 		Long:  keyHelp,
 		Run: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			if len(args) < 1 {
 				out.Error(ErrAtLeastOneArg)
 				return

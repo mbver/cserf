@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/pb"
 	"github.com/spf13/cobra"
 )
@@ -10,6 +11,7 @@ func LeaveCommand() *cobra.Command {
 		Use:   "leave",
 		Short: "leave the cluster",
 		Run: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			out.Info("gonna leave, don't be clingy to me ...")
 			_, err := gClient.Leave(&pb.Empty{})
 			if err != nil {

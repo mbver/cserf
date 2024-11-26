@@ -18,6 +18,7 @@ func ConfigCommand() *cobra.Command {
 		Use:   "config <path>",
 		Short: "create a YAML config file",
 		Run: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			if len(args) < 1 {
 				out.Error(ErrAtLeastOneArg)
 				return

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/pb"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -19,6 +20,7 @@ func JoinCommand() *cobra.Command {
 		Use:   "join",
 		Short: "join existing nodes in cluster",
 		Run: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			vp := viper.New()
 			vp.BindPFlags(cmd.Flags())
 			addrStr := vp.GetString(FlagAddrs)

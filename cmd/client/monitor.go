@@ -18,6 +18,7 @@ func MonitorCommand() *cobra.Command {
 		Use:   "monitor",
 		Short: "monitor events and logs from the server's serf",
 		Run: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			vp := viper.New()
 			vp.BindPFlags(cmd.Flags())
 			filter := vp.GetString(FlagEventFilter)

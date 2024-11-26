@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/mbver/cserf/cmd/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -9,6 +10,7 @@ func ActionCommand() *cobra.Command {
 		Use:   "action <name> <payload>",
 		Short: "dispatch a cluster action",
 		Run: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			if len(args) < 1 {
 				out.Error(ErrAtLeastOneArg)
 				return

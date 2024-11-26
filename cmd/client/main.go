@@ -15,13 +15,13 @@ const (
 	FlagCertPath = "cert"
 )
 
-var out = utils.DefaultOutput()
 var gClient *client.Client
 
 func main() {
 	cmd := cobra.Command{
 		Use: "serf",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			name := cmd.Name()
 			if name == "keygen" || name == "config" || name == "cert" {
 				return
@@ -44,6 +44,7 @@ func main() {
 			out.Infof("connected to server at %s", addr)
 		},
 		PersistentPostRun: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			if gClient != nil {
 				out.Info("closing client ...")
 				gClient.Close()

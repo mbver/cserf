@@ -11,13 +11,12 @@ const (
 	FlagConfig = "conf"
 )
 
-var out = utils.DefaultOutput()
-
 func main() {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "start a grpc server",
 		Run: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			vp := viper.New()
 			vp.BindPFlags(cmd.Flags())
 			confPath := vp.GetString(FlagConfig)

@@ -12,6 +12,7 @@ func CertGenCommand() *cobra.Command {
 		Use:   "cert <dir>",
 		Short: "generate self-signed cert and key, for testing purpose",
 		Run: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			if len(args) < 1 {
 				out.Error(ErrAtLeastOneArg)
 				return

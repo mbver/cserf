@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mbver/cserf/cmd/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -12,6 +13,7 @@ func ReachCommand() *cobra.Command {
 		Use:   "reach",
 		Short: "test reachability of nodes in the cluster",
 		Run: func(cmd *cobra.Command, args []string) {
+			out := utils.CreateOutputFromCmd(cmd)
 			actives, err := gClient.Active()
 			if err != nil {
 				out.Error(err)
