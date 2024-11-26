@@ -62,7 +62,7 @@ func TagsCommand() *cobra.Command {
 				out.Error(err)
 				return
 			}
-			out.Result(fmt.Sprintf("succeesfully %s tags with %s", command, args[1]), nil)
+			out.Result(fmt.Sprintf("successfully %s tags with %s", command, args[1]), nil)
 		},
 	}
 	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")

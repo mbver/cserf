@@ -247,6 +247,63 @@ func TestKey(t *testing.T) {
 	require.NotContains(t, res, "error")
 }
 
+func TestTags(t *testing.T) {
+	node, cleanup, err := startTestServer() // don't mess with the common test server
+	defer cleanup()
+	require.Nil(t, err)
+
+	cmd := TagsCommand()
+	cmd.Flags().Set(FlagRpcAddr, node.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.SetArgs([]string{"unset", "role"})
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.Execute()
+
+	res := out.String()
+	require.Contains(t, res, "successfully unset tags")
+	require.NotContains(t, res, "error")
+
+	cmd = MembersCommand()
+	cmd.Flags().Set(FlagRpcAddr, node.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+
+	out = bytes.Buffer{}
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.Execute()
+
+	res = out.String()
+	require.NotContains(t, res, "role")
+
+	cmd = TagsCommand()
+	cmd.Flags().Set(FlagRpcAddr, node.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.SetArgs([]string{"update", "role=newrole"})
+
+	out = bytes.Buffer{}
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.Execute()
+
+	res = out.String()
+	require.Contains(t, res, "successfully update tags")
+
+	cmd = MembersCommand()
+	cmd.Flags().Set(FlagRpcAddr, node.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+
+	out = bytes.Buffer{}
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.Execute()
+
+	res = out.String()
+	require.Contains(t, res, "role=newrole")
+}
+
 func TestLeave(t *testing.T) {
 	node, cleanup, err := startTestServer() // don't mess with the common test server
 	defer cleanup()
