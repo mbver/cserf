@@ -415,6 +415,11 @@ func TestJoin(t *testing.T) {
 }
 
 func TestQuery(t *testing.T) {
+	id1 := commonCluster.node1.server.ID()
+	id2 := commonCluster.node2.server.ID()
+	id3 := commonCluster.node3.server.ID()
+
+	// no filter
 	cmd := QueryCommand()
 	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
@@ -425,10 +430,76 @@ func TestQuery(t *testing.T) {
 	cmd.Execute()
 
 	res := out.String()
-	require.Contains(t, res, commonCluster.node1.server.ID())
-	require.Contains(t, res, commonCluster.node2.server.ID())
-	require.Contains(t, res, commonCluster.node3.server.ID())
+	require.Contains(t, res, id1)
+	require.Contains(t, res, id2)
+	require.Contains(t, res, id3)
 	require.Contains(t, res, "total number of responses: 3")
+	require.NotContains(t, res, "error")
+
+	// node filter
+	cmd = QueryCommand()
+	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+
+	cmd.Flags().Set(FlagNodeFilter, fmt.Sprintf("%s,%s", id2, id3))
+	out1 := bytes.Buffer{}
+	cmd.SetOut(&out1)
+	cmd.SetErr(&out1)
+	cmd.Execute()
+
+	res = out1.String()
+	require.NotContains(t, res, id1)
+	require.Contains(t, res, id2)
+	require.Contains(t, res, id3)
+	require.Contains(t, res, "total number of responses: 2")
+	require.NotContains(t, res, "error")
+
+	// role filter
+	cmd = QueryCommand()
+	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.Flags().Set(FlagTag, "role=superstar")
+	out2 := bytes.Buffer{}
+	cmd.SetOut(&out2)
+	cmd.SetErr(&out2)
+	cmd.Execute()
+
+	res = out2.String()
+	require.NotContains(t, res, "response from")
+	require.Contains(t, res, "total number of responses: 0")
+	require.NotContains(t, res, "error")
+
+	// role filter
+	cmd = QueryCommand()
+	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.Flags().Set(FlagTag, "role=something")
+	out3 := bytes.Buffer{}
+	cmd.SetOut(&out3)
+	cmd.SetErr(&out3)
+	cmd.Execute()
+
+	res = out3.String()
+	require.Contains(t, res, id1)
+	require.Contains(t, res, id2)
+	require.Contains(t, res, id3)
+	require.Contains(t, res, "total number of responses: 3")
+	require.NotContains(t, res, "error")
+
+	// role filter
+	cmd = QueryCommand()
+	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.Flags().Set(FlagTag, "role=something,name=x")
+	out4 := bytes.Buffer{}
+	cmd.SetOut(&out4)
+	cmd.SetErr(&out4)
+	cmd.Execute()
+
+	res = out4.String()
+	fmt.Println(res)
+	require.NotContains(t, res, "response from")
+	require.Contains(t, res, "total number of responses: 0")
 	require.NotContains(t, res, "error")
 }
 
