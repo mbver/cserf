@@ -76,6 +76,9 @@ var commonTestNode *testNode
 var commonCluster *threeNodeCluster
 
 func TestMain(m *testing.M) {
+	os.Setenv("SERF_RPC_AUTH", "st@rship")
+	defer os.Unsetenv("SERF_RPC_AUTH")
+
 	cmd := CertGenCommand()
 	cmd.SetArgs([]string{"./"})
 	cmd.Execute()
