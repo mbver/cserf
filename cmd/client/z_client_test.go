@@ -37,20 +37,12 @@ type testNode struct {
 
 func startTestServer() (*testNode, func(), error) {
 	cleanup := func() {}
-	err := utils.CreateTestEventScript("./")
-	if err != nil {
-		return nil, cleanup, err
-	}
-	cleanup = func() { os.Remove("./eventscript.sh") }
-
 	conf, err := utils.CreateTestServerConfig()
 	if err != nil {
 		return nil, cleanup, err
 	}
-	conf.SerfConfig.EventScript = "./eventscript.sh"
 
-	ip, cleanup1 := testaddr.BindAddrs.NextAvailAddr()
-	cleanup2 := server.CombineCleanup(cleanup1, cleanup)
+	ip, cleanup := testaddr.BindAddrs.NextAvailAddr()
 
 	conf.MemberlistConfig.BindAddr = ip.String()
 	conf.RpcPort = nextRpcPort()
@@ -60,6 +52,15 @@ func startTestServer() (*testNode, func(), error) {
 	snapshotPath := fmt.Sprintf("%s.snap", conf.MemberlistConfig.BindAddr)
 	conf.SerfConfig.SnapshotPath = snapshotPath // skip auto-join
 	conf.ClusterName = ""                       // skip auto-join
+
+	scriptname := fmt.Sprintf("%s_eventscript.sh", ip.String())
+	err = utils.CreateTestEventScript("./", scriptname)
+	if err != nil {
+		return nil, cleanup, err
+	}
+	cleanup1 := func() { os.Remove(scriptname) }
+	conf.SerfConfig.EventScript = fmt.Sprintf("./%s", scriptname)
+	cleanup2 := server.CombineCleanup(cleanup1, cleanup)
 
 	s, cleanup3, err := server.CreateServer(conf)
 	cleanup4 := server.CombineCleanup(cleanup3, func() { os.Remove(snapshotPath) }, cleanup2)

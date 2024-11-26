@@ -132,8 +132,8 @@ func testSerfConfig() *serf.Config {
 	return conf
 }
 
-func CreateTestEventScript(path string) error {
-	filename := filepath.Join(path, "eventscript.sh")
+func CreateTestEventScript(path string, scriptname string) error {
+	filename := filepath.Join(path, scriptname)
 	fh, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return err

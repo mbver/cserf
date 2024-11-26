@@ -42,12 +42,13 @@ func ConfigCommand() *cobra.Command {
 					return
 				}
 				dir := filepath.Dir(path)
-				err := utils.CreateTestEventScript(dir)
+				scriptname := "eventscript.sh"
+				err := utils.CreateTestEventScript(dir, scriptname)
 				if err != nil {
 					out.Error(err)
 					return
 				}
-				conf.SerfConfig.EventScript = "./eventscript.sh"
+				conf.SerfConfig.EventScript = scriptname
 			}
 			ybytes, err := yaml.Marshal(conf)
 			if err != nil {
