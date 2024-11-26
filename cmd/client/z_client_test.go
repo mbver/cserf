@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -389,4 +390,44 @@ func TestReach(t *testing.T) {
 	require.Contains(t, res, "response counts:")
 	require.Contains(t, res, "3/3")
 	require.NotContains(t, res, "error")
+}
+
+func extractRtt(s string) (time.Duration, error) {
+	re := regexp.MustCompile(`rtt:\s*"([^"]+)"`)
+	match := re.FindStringSubmatch(s)
+	if len(match) > 1 {
+		return time.ParseDuration(match[1])
+	}
+	return 0, fmt.Errorf("RTT not found in input string")
+}
+
+func TestRtt(t *testing.T) {
+	cmd := RttCommand()
+	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.SetArgs([]string{commonCluster.node2.server.ID()})
+	out := bytes.Buffer{}
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.Execute()
+
+	res := out.String()
+	require.Contains(t, res, "µs")
+	rtt, err := extractRtt(res)
+	require.Nil(t, err)
+	require.Greater(t, rtt, 100*time.Microsecond)
+	require.Less(t, rtt, 500*time.Microsecond)
+
+	cmd.SetArgs([]string{commonCluster.node2.server.ID(), commonCluster.node3.server.ID()})
+	out = bytes.Buffer{}
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.Execute()
+
+	res = out.String()
+	require.Contains(t, res, "µs")
+	rtt, err = extractRtt(res)
+	require.Nil(t, err)
+	require.Greater(t, rtt, 100*time.Microsecond)
+	require.Less(t, rtt, 500*time.Microsecond)
 }
