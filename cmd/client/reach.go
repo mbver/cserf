@@ -38,7 +38,7 @@ func ReachCommand() *cobra.Command {
 				out.Error(err)
 				return
 			}
-			out.Result("response counts:", fmt.Sprintf("%d/%d", res.NumRes, res.NumNode))
+			out.Result("response counts", fmt.Sprintf("%d/%d", res.NumRes, res.NumNode))
 			if res.NumRes < res.NumNode {
 				out.Error(fmt.Errorf("too few responses: %d/%d", res.NumRes, res.NumNode))
 			}

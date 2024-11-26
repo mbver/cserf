@@ -49,7 +49,9 @@ func startTestServer() (*testNode, func(), error) {
 	}
 	conf.SerfConfig.EventScript = "./eventscript.sh"
 
-	ip, cleanup := testaddr.BindAddrs.NextAvailAddr()
+	ip, cleanup1 := testaddr.BindAddrs.NextAvailAddr()
+	cleanup2 := server.CombineCleanup(cleanup1, cleanup)
+
 	conf.MemberlistConfig.BindAddr = ip.String()
 	conf.RpcPort = nextRpcPort()
 	conf.CertPath = certPath
@@ -58,13 +60,14 @@ func startTestServer() (*testNode, func(), error) {
 	snapshotPath := fmt.Sprintf("%s.snap", conf.MemberlistConfig.BindAddr)
 	conf.SerfConfig.SnapshotPath = snapshotPath // skip auto-join
 	conf.ClusterName = ""                       // skip auto-join
-	s, cleanup1, err := server.CreateServer(conf)
-	cleanup2 := server.CombineCleanup(cleanup1, func() { os.Remove(snapshotPath) }, cleanup)
+
+	s, cleanup3, err := server.CreateServer(conf)
+	cleanup4 := server.CombineCleanup(cleanup3, func() { os.Remove(snapshotPath) }, cleanup2)
 	if err != nil {
-		return nil, cleanup2, err
+		return nil, cleanup4, err
 	}
 	rpcAddr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
-	return &testNode{s, rpcAddr}, cleanup2, nil
+	return &testNode{s, rpcAddr}, cleanup4, nil
 }
 
 var commonTestNode *testNode
@@ -157,6 +160,7 @@ func TestMembers(t *testing.T) {
 	require.Contains(t, res, commonTestNode.server.ID())
 	require.Contains(t, res, "members")
 	require.Contains(t, res, "alive")
+	require.NotContains(t, res, "error")
 }
 
 func TestAction(t *testing.T) {
@@ -171,6 +175,7 @@ func TestAction(t *testing.T) {
 
 	res := out.String()
 	require.Contains(t, res, "output: success")
+	require.NotContains(t, res, "error")
 }
 
 func TestKey(t *testing.T) {
@@ -347,6 +352,7 @@ func TestJoin(t *testing.T) {
 	res := out.String()
 	require.Contains(t, res, "successful joins")
 	require.Contains(t, res, "2/2")
+	require.NotContains(t, res, "error")
 }
 
 func TestQuery(t *testing.T) {
@@ -364,4 +370,22 @@ func TestQuery(t *testing.T) {
 	require.Contains(t, res, commonCluster.node2.server.ID())
 	require.Contains(t, res, commonCluster.node3.server.ID())
 	require.Contains(t, res, "total number of responses: 3")
+	require.NotContains(t, res, "error")
+}
+
+func TestReach(t *testing.T) {
+	cmd := ReachCommand()
+	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+
+	out := bytes.Buffer{}
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.Execute()
+
+	res := out.String()
+	require.Contains(t, res, "took")
+	require.Contains(t, res, "response counts:")
+	require.Contains(t, res, "3/3")
+	require.NotContains(t, res, "error")
 }
