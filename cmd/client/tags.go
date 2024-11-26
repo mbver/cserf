@@ -18,7 +18,7 @@ func isValidTagCommand(s string) bool {
 	return s == tagUnsetCommand || s == tagUpdateCommand
 }
 func TagsCommand() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "tags <command> <data>",
 		Short: "modify tags of the server's serf",
 		Long:  tagsText,
@@ -45,7 +45,19 @@ func TagsCommand() *cobra.Command {
 			if command == tagUnsetCommand {
 				req.Keys = strings.Split(args[1], ",")
 			}
-			_, err := gClient.Tag(req)
+
+			gClient, err := getClientFromCmd(cmd)
+			if err != nil {
+				out.Error(err)
+				return
+			}
+			out.Info("connect successfully to server...")
+			defer func() {
+				gClient.Close()
+				out.Info("client closed")
+			}()
+
+			_, err = gClient.Tag(req)
 			if err != nil {
 				out.Error(err)
 				return
@@ -53,6 +65,9 @@ func TagsCommand() *cobra.Command {
 			out.Result(fmt.Sprintf("succeesfully %s tags with %s", command, args[1]), nil)
 		},
 	}
+	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
+	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
+	return cmd
 }
 
 const tagsText = `

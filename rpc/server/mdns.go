@@ -92,6 +92,9 @@ func (m *ClusterMDNS) run() {
 			join = append(join, addr)
 			waitCh = time.After(mdnsWaitInterval)
 		case <-waitCh:
+			if len(join) == 0 {
+				continue
+			}
 			n, err := m.serf.Join(join, m.ignoreOld)
 			if err != nil {
 				m.logger.Printf("[ERR] cluster_mdns: failed to join %v", err)

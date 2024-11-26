@@ -9,11 +9,23 @@ import (
 )
 
 func ReachCommand() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "reach",
 		Short: "test reachability of nodes in the cluster",
 		Run: func(cmd *cobra.Command, args []string) {
 			out := utils.CreateOutputFromCmd(cmd)
+
+			gClient, err := getClientFromCmd(cmd)
+			if err != nil {
+				out.Error(err)
+				return
+			}
+			out.Info("connect successfully to server...")
+			defer func() {
+				gClient.Close()
+				out.Info("client closed")
+			}()
+
 			actives, err := gClient.Active()
 			if err != nil {
 				out.Error(err)
@@ -41,4 +53,7 @@ func ReachCommand() *cobra.Command {
 			}
 		},
 	}
+	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
+	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
+	return cmd
 }

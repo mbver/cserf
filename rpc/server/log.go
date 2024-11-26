@@ -126,7 +126,6 @@ type Syslog struct {
 	logger gsyslog.Syslogger
 }
 
-// Write is used to implement io.Writer
 func (s *Syslog) Write(p []byte) (int, error) {
 	// Extract log level
 	var level string

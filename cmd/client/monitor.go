@@ -23,6 +23,18 @@ func MonitorCommand() *cobra.Command {
 			vp.BindPFlags(cmd.Flags())
 			filter := vp.GetString(FlagEventFilter)
 			level := vp.GetString(FlagLogLevel)
+
+			gClient, err := getClientFromCmd(cmd)
+			if err != nil {
+				out.Error(err)
+				return
+			}
+			out.Info("connect successfully to server...")
+			defer func() {
+				gClient.Close()
+				out.Info("client closed")
+			}()
+
 			stream, cancel, err := gClient.Monitor(&pb.MonitorRequest{
 				EventFilter: filter,
 				LogLevel:    level,
@@ -71,6 +83,8 @@ func MonitorCommand() *cobra.Command {
 			out.Result("streaming terminated", nil)
 		},
 	}
+	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
+	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
 	cmd.Flags().String(FlagEventFilter, "*", "the type of events to be moninored")
 	cmd.Flags().String(FlagLogLevel, "INFO", "the minimum log level to stream")
 	return cmd

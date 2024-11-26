@@ -7,13 +7,25 @@ import (
 )
 
 func LeaveCommand() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "leave",
 		Short: "leave the cluster",
 		Run: func(cmd *cobra.Command, args []string) {
 			out := utils.CreateOutputFromCmd(cmd)
 			out.Info("gonna leave, don't be clingy to me ...")
-			_, err := gClient.Leave(&pb.Empty{})
+
+			gClient, err := getClientFromCmd(cmd)
+			if err != nil {
+				out.Error(err)
+				return
+			}
+			out.Info("connect successfully to server...")
+			defer func() {
+				gClient.Close()
+				out.Info("client closed")
+			}()
+
+			_, err = gClient.Leave(&pb.Empty{})
 			if err != nil {
 				out.Error(err)
 				return
@@ -21,4 +33,7 @@ func LeaveCommand() *cobra.Command {
 			out.Result("leave successfully", nil)
 		},
 	}
+	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
+	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
+	return cmd
 }

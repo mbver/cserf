@@ -35,6 +35,17 @@ func QueryCommand() *cobra.Command {
 			payload := vp.GetString(FlagPayload)
 			p := toQueryParams(name, nodeStr, tagStr, timeout, relay, payload)
 
+			gClient, err := getClientFromCmd(cmd)
+			if err != nil {
+				out.Error(err)
+				return
+			}
+			out.Info("connect successfully to server...")
+			defer func() {
+				gClient.Close()
+				out.Info("client closed")
+			}()
+
 			resCh, cancel, err := gClient.Query(p)
 			defer cancel()
 
@@ -47,6 +58,8 @@ func QueryCommand() *cobra.Command {
 			}
 		},
 	}
+	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
+	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
 	cmd.Flags().String(FlagName, "", "query name")
 	cmd.Flags().String(FlagNodeFilter, "", "query targets, empty means all nodes")
 	cmd.Flags().String(FlagTag, "", "tags filter. empty means no filter")

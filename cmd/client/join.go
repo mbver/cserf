@@ -30,6 +30,18 @@ func JoinCommand() *cobra.Command {
 			}
 			addrs := strings.Split(addrStr, ",")
 			ignoreOld := vp.GetBool(FlagIngoreOld)
+
+			gClient, err := getClientFromCmd(cmd)
+			if err != nil {
+				out.Error(err)
+				return
+			}
+			out.Info("connect successfully to server...")
+			defer func() {
+				gClient.Close()
+				out.Info("client closed")
+			}()
+
 			res, err := gClient.Join(&pb.JoinRequest{
 				Addrs:     addrs,
 				IgnoreOld: ignoreOld,
@@ -44,6 +56,8 @@ func JoinCommand() *cobra.Command {
 
 		},
 	}
+	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
+	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
 	cmd.Flags().String(FlagAddrs, "", `list of existing nodes' addresses to join, separated by ","`)
 	cmd.Flags().Bool(FlagIngoreOld, false, "ignore old events from existing nodes while joining")
 	return cmd

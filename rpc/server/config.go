@@ -10,8 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// to nest memberlist config and serf config
-// and see how they include default config
 type ServerConfig struct {
 	RpcAddress       string             `yaml:"rpc_addr"`
 	RpcPort          int                `yaml:"rpc_port"`
@@ -29,7 +27,6 @@ type ServerConfig struct {
 	StartJoin        []string           `yaml:"start_join"`
 	MemberlistConfig *memberlist.Config `yaml:"memberlist_config"`
 	SerfConfig       *serf.Config       `yaml:"serf_config"`
-	// TODO: auth?
 }
 
 func DefaultServerConfig() *ServerConfig {

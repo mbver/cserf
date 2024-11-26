@@ -7,13 +7,28 @@ import (
 )
 
 func InfoCommand() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "info",
 		Short: "node information and stats",
 		Run: func(cmd *cobra.Command, args []string) {
 			out := utils.CreateOutputFromCmd(cmd)
+
+			gClient, err := getClientFromCmd(cmd)
+			if err != nil {
+				out.Error(err)
+				return
+			}
+			out.Info("connect successfully to server...")
+			defer func() {
+				gClient.Close()
+				out.Info("client closed")
+			}()
+
 			info, _ := gClient.Info(&pb.Empty{})
 			out.Result("info", info)
 		},
 	}
+	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
+	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
+	return cmd
 }

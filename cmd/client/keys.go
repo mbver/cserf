@@ -14,7 +14,7 @@ func isValidKeyCommand(s string) bool {
 }
 
 func KeyCommand() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "keys <command> <key>",
 		Short: "manage encryption keys in serf",
 		Long:  keyHelp,
@@ -37,6 +37,18 @@ func KeyCommand() *cobra.Command {
 				}
 				key = args[1]
 			}
+
+			gClient, err := getClientFromCmd(cmd)
+			if err != nil {
+				out.Error(err)
+				return
+			}
+			out.Info("connect successfully to server...")
+			defer func() {
+				gClient.Close()
+				out.Info("client closed")
+			}()
+
 			resp, err := gClient.Key(command, key)
 			if err != nil {
 				out.Error(err)
@@ -45,6 +57,9 @@ func KeyCommand() *cobra.Command {
 			out.Result("key response", resp)
 		},
 	}
+	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
+	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
+	return cmd
 }
 
 const keyHelp string = `

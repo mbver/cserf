@@ -19,6 +19,18 @@ func RttCommand() *cobra.Command {
 			if len(args) == 1 {
 				args = append(args, "") // empty means using the server's node
 			}
+
+			gClient, err := getClientFromCmd(cmd)
+			if err != nil {
+				out.Error(err)
+				return
+			}
+			out.Info("connect successfully to server...")
+			defer func() {
+				gClient.Close()
+				out.Info("client closed")
+			}()
+
 			rtt, err := gClient.Rtt(&pb.RttRequest{
 				First:  args[0],
 				Second: args[1],
@@ -30,5 +42,7 @@ func RttCommand() *cobra.Command {
 			out.Result("rtt", rtt.AsDuration().String())
 		},
 	}
+	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
+	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
 	return cmd
 }
