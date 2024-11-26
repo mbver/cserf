@@ -488,3 +488,148 @@ func TestRtt(t *testing.T) {
 	require.Greater(t, rtt, 100*time.Microsecond)
 	require.Less(t, rtt, 500*time.Microsecond)
 }
+
+func TestMonitor(t *testing.T) {
+	s, cleanup, err := startTestServer()
+	defer cleanup()
+	require.Nil(t, err)
+
+	var actionPayload = "action_payload"
+	var queryPayload = "query_payload"
+
+	aCmd := ActionCommand()
+	aCmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
+	aCmd.Flags().Set(FlagCertPath, certPath)
+	aCmd.SetArgs([]string{"action1", actionPayload})
+
+	qCmd := QueryCommand()
+	qCmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
+	qCmd.Flags().Set(FlagCertPath, certPath)
+	qCmd.Flags().Set(FlagName, "query1")
+	qCmd.Flags().Set(FlagPayload, queryPayload)
+
+	// no filter
+	cmd := MonitorCommand()
+	cmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	go func() {
+		cmd.Execute()
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+
+	aCmd.Execute()
+	qCmd.Execute()
+
+	time.Sleep(25 * time.Millisecond)
+
+	res := out.String()
+	require.Contains(t, res, actionPayload)
+	require.Contains(t, res, queryPayload)
+
+	// event-filter action
+	cmd = MonitorCommand()
+	cmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.Flags().Set(FlagEventFilter, "action")
+	out1 := bytes.Buffer{}
+	cmd.SetOut(&out1)
+	cmd.SetErr(&out1)
+	go func() {
+		cmd.Execute()
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	aCmd.Execute()
+	qCmd.Execute()
+
+	time.Sleep(25 * time.Millisecond)
+	res = out1.String()
+	require.Contains(t, res, actionPayload)
+	require.NotContains(t, res, queryPayload)
+
+	// event-fitler: member-join,member-failed,member-reap
+	cmd = MonitorCommand()
+	cmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.Flags().Set(FlagEventFilter, "member-join,member-failed,member-reap")
+	out2 := bytes.Buffer{}
+	cmd.SetOut(&out2)
+	cmd.SetErr(&out2)
+	go func() {
+		cmd.Execute()
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	s1, cleanup1, err := startTestServer()
+	defer cleanup1()
+	require.Nil(t, err)
+	addr1, err := s1.server.SerfAddress()
+	require.Nil(t, err)
+
+	jCmd := JoinCommand()
+	jCmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
+	jCmd.Flags().Set(FlagCertPath, certPath)
+	jCmd.SetArgs([]string{addr1})
+	jCmd.Execute()
+	aCmd.Execute()
+	qCmd.Execute()
+
+	time.Sleep(25 * time.Millisecond)
+
+	res = out2.String()
+	require.Contains(t, res, "event-type: member-join")
+	str := fmt.Sprintf("%s - %s - role=something", s1.server.ID(), addr1)
+	require.Contains(t, res, str)
+	require.NotContains(t, res, queryPayload)
+	require.NotContains(t, res, actionPayload)
+
+	s1.server.Shutdown()
+	time.Sleep(50 * time.Millisecond)
+	res = out2.String()
+	require.Contains(t, res, "event-type: member-failed")
+	require.Contains(t, res, "event-type: member-reap")
+
+	// loglevel DEBUG
+	cmd = MonitorCommand()
+	cmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.Flags().Set(FlagLogLevel, "DEBUG")
+	out3 := bytes.Buffer{}
+	cmd.SetOut(&out3)
+	cmd.SetErr(&out3)
+	go func() {
+		cmd.Execute()
+	}()
+	time.Sleep(10 * time.Millisecond)
+	aCmd.Execute()
+	qCmd.Execute()
+
+	time.Sleep(25 * time.Millisecond)
+
+	res = out3.String()
+	require.Contains(t, res, "DEBUG")
+
+	// logleve ERR
+	cmd = MonitorCommand()
+	cmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.Flags().Set(FlagLogLevel, "ERR")
+	out4 := bytes.Buffer{}
+	cmd.SetOut(&out4)
+	cmd.SetErr(&out4)
+	go func() {
+		cmd.Execute()
+	}()
+	time.Sleep(10 * time.Millisecond)
+	aCmd.Execute()
+	qCmd.Execute()
+
+	time.Sleep(25 * time.Millisecond)
+
+	res = out4.String()
+	require.NotContains(t, res, "INFO")
+}

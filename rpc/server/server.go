@@ -47,6 +47,7 @@ func authInterceptor(authKeyHash string) grpc.UnaryServerInterceptor {
 	}
 }
 
+// TODO: authkey check for stream connection?
 func CreateServer(conf *ServerConfig) (*Server, func(), error) {
 	cleanup := func() {}
 	if conf == nil {
@@ -378,7 +379,7 @@ func nodeToString(n *memberlist.Node) string {
 }
 
 func actionEventToString(e *serf.ActionEvent) string {
-	return fmt.Sprintf("action: %d - %s - %s", e.LTime, e.Name, string(e.Payload))
+	return fmt.Sprintf("action %d - %s - %s", e.LTime, e.Name, string(e.Payload))
 }
 
 func queryEventToString(e *serf.QueryEvent) string {
