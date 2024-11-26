@@ -76,7 +76,7 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 		return cleanup, err
 	}
 
-	cleanup1 := CombineCleanup(cleanup, serf.Shutdown)
+	cleanup = serf.Shutdown
 
 	// start mdns service
 	if conf.ClusterName != "" {
@@ -92,7 +92,7 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 	if err != nil {
 		return cleanup, err
 	}
-	cleanup2 := CombineCleanup(cleanup1, func() { l.Close() })
+	cleanup1 := CombineCleanup(func() { l.Close() }, cleanup)
 
 	server := &Server{
 		serf:       serf,
@@ -104,7 +104,7 @@ func CreateServer(conf *ServerConfig) (func(), error) {
 		grpc.UnaryInterceptor(authInterceptor(conf.AuthKeyHash)),
 	)
 	pb.RegisterSerfServer(s, server)
-
+	cleanup2 := CombineCleanup(s.Stop, cleanup1)
 	go func() {
 		if err := s.Serve(l); err != nil {
 			logger.Printf("[ERR] grpc-server: failed serving %v", err)
