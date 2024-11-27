@@ -45,6 +45,7 @@ func main() {
 	cmd.AddCommand(MonitorCommand())
 	cmd.AddCommand(ConfigCommand())
 	cmd.AddCommand(CertGenCommand())
+	cmd.AddCommand(ServerCommand())
 
 	cmd.Execute()
 }

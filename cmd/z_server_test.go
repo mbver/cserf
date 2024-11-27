@@ -79,3 +79,20 @@ func TestServer_KeyringFile_Keysloaded(t *testing.T) {
 	require.Contains(t, res, key2)
 	require.Contains(t, res, key3)
 }
+
+func TestServer_KeyringFile_NoKey(t *testing.T) {
+	conf, cleanup, err := testConfig()
+	defer cleanup()
+	require.Nil(t, err)
+
+	keyfile := "keyring_no_key_test.json"
+	err = utils.CreateTestKeyringFile("./", keyfile, []string{})
+	require.Nil(t, err)
+	defer os.Remove(keyfile)
+
+	conf.SerfConfig.KeyringFile = keyfile
+	_, cleanup1, err := startServerWithConfig(conf)
+	defer cleanup1()
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "required at least 1 key")
+}

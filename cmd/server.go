@@ -11,7 +11,7 @@ const (
 	FlagConfig = "conf"
 )
 
-func main() {
+func ServerCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "start a grpc server",
@@ -37,5 +37,5 @@ func main() {
 		},
 	}
 	cmd.Flags().String(FlagConfig, "./config.yaml", "path to YAML server-config file")
-	cmd.Execute()
+	return cmd
 }
