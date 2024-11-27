@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"math/big"
 	"net"
@@ -128,6 +129,7 @@ func testSerfConfig() *serf.Config {
 	conf.ReapInterval = 10 * time.Millisecond
 	conf.ReconnectTimeout = 5 * time.Millisecond
 	conf.TombstoneTimeout = 5 * time.Millisecond
+	conf.SnapshotDrainTimeout = 50 * time.Millisecond
 	conf.Tags = map[string]string{"role": "something"}
 	return conf
 }
@@ -146,6 +148,24 @@ func CreateTestEventScript(path string, scriptname string) error {
 	return nil
 }
 
+func CreateTestKeyringFile(path string, name string, keys []string) error {
+	filename := filepath.Join(path, name)
+	fh, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+
+	jbytes, err := json.MarshalIndent(keys, "", "  ")
+	if err != nil {
+		return err
+	}
+	if _, err := fh.Write(jbytes); err != nil {
+		return err
+	}
+	return nil
+}
+
 func CreateTestServerConfig() (*server.ServerConfig, error) {
 	mconf := testMemberlistConfig()
 	mconf.BindAddr = "127.0.0.10"
@@ -156,7 +176,6 @@ func CreateTestServerConfig() (*server.ServerConfig, error) {
 	conf.LogPrefix = "serf: "
 	conf.MemberlistConfig = mconf
 	conf.SerfConfig = sconf
-	conf.EncryptKey = "T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="
 	hash, err := server.HashPwd("st@rship")
 	if err != nil {
 		return nil, err

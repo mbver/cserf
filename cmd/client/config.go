@@ -49,6 +49,13 @@ func ConfigCommand() *cobra.Command {
 					return
 				}
 				conf.SerfConfig.EventScript = scriptname
+				keyfilename := "keyring.json"
+				err = utils.CreateTestKeyringFile(dir, keyfilename, []string{"T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="})
+				if err != nil {
+					out.Error(err)
+					return
+				}
+				conf.SerfConfig.KeyringFile = keyfilename
 			}
 			ybytes, err := yaml.Marshal(conf)
 			if err != nil {

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -19,7 +21,6 @@ type ServerConfig struct {
 	SyslogFacility   string             `yaml:"syslog_facility"`
 	CertPath         string             `yaml:"cert_path"`
 	KeyPath          string             `yaml:"key_path"`
-	EncryptKey       string             `yaml:"encrypt_key"`
 	AuthKeyHash      string             `yaml:"auth_key_hash"`
 	ClusterName      string             `yaml:"cluster_name"`
 	NetInterface     string             `yaml:"net_interface"` // iface has to be valid or empty
@@ -113,5 +114,30 @@ func bindIface(name string, addr string) (string, error) {
 		return "", fmt.Errorf("interface %s has no address %s", name, addr)
 	}
 	return addr, nil
+}
 
+func loadKeyring(keyfile string) (*memberlist.Keyring, error) {
+	if _, err := os.Stat(keyfile); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(keyfile)
+	if err != nil {
+		return nil, err
+	}
+	encoded := []string{}
+	if err := json.Unmarshal([]byte(data), &encoded); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal keys data %w", err)
+	}
+	keys := make([][]byte, len(encoded))
+	for i, enc := range encoded {
+		key, err := base64.StdEncoding.DecodeString(enc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode key %w", err)
+		}
+		keys[i] = key
+	}
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("required at least 1 key")
+	}
+	return memberlist.NewKeyring(keys, keys[0])
 }

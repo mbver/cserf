@@ -9,7 +9,7 @@ require (
 	github.com/hashicorp/go-msgpack/v2 v2.1.2
 	github.com/hashicorp/go-syslog v1.0.0
 	github.com/hashicorp/logutils v1.0.0
-	github.com/mbver/mlist v0.0.0-20241124044033-4ac7c5e0265e
+	github.com/mbver/mlist v0.0.0-20241127082131-8959dff89d1a
 	github.com/mbver/mmdns v0.0.0-20240710115102-12a2c9be617a
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0

@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"fmt"
 	"log"
 	"net"
@@ -128,20 +127,10 @@ func createSerf(conf *ServerConfig, logger *log.Logger) (*serf.Serf, error) {
 	b := &serf.SerfBuilder{}
 	b.WithLogger(logger)
 
-	if conf.EncryptKey == "" {
-		return nil, fmt.Errorf("encrypt key is required")
-	}
-
-	key, err := base64.StdEncoding.DecodeString(conf.EncryptKey)
+	keyring, err := loadKeyring(conf.SerfConfig.KeyringFile)
 	if err != nil {
 		return nil, err
 	}
-
-	keyring, err := memberlist.NewKeyring(nil, key)
-	if err != nil {
-		return nil, err
-	}
-
 	b.WithKeyring(keyring)
 
 	b.WithMemberlistConfig(conf.MemberlistConfig)

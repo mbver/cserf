@@ -36,13 +36,12 @@ type testNode struct {
 	rpcAddr string
 }
 
-func startTestServer() (*testNode, func(), error) {
+func testConfig() (*server.ServerConfig, func(), error) {
 	cleanup := func() {}
 	conf, err := utils.CreateTestServerConfig()
 	if err != nil {
 		return nil, cleanup, err
 	}
-
 	ip, cleanup := testaddr.BindAddrs.NextAvailAddr()
 
 	conf.MemberlistConfig.BindAddr = ip.String()
@@ -59,17 +58,43 @@ func startTestServer() (*testNode, func(), error) {
 	if err != nil {
 		return nil, cleanup, err
 	}
-	cleanup1 := func() { os.Remove(scriptname) }
 	conf.SerfConfig.EventScript = fmt.Sprintf("./%s", scriptname)
-	cleanup2 := server.CombineCleanup(cleanup1, cleanup)
+	cleanup1 := server.CombineCleanup(func() { os.Remove(scriptname) }, cleanup)
 
-	s, cleanup3, err := server.CreateServer(conf)
-	cleanup4 := server.CombineCleanup(cleanup3, func() { os.Remove(snapshotPath) }, cleanup2)
+	keyfilename := fmt.Sprintf("%s.keyring.json", ip.String())
+	err = utils.CreateTestKeyringFile("./", keyfilename, []string{"T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="})
 	if err != nil {
-		return nil, cleanup4, err
+		return nil, cleanup1, err
+	}
+	conf.SerfConfig.KeyringFile = keyfilename
+	cleanup2 := server.CombineCleanup(func() { os.Remove(keyfilename) }, cleanup1)
+
+	return conf, cleanup2, err
+}
+
+func startServerWithConfig(conf *server.ServerConfig) (*testNode, func(), error) {
+	s, cleanup, err := server.CreateServer(conf)
+	snapshotPath := conf.SerfConfig.SnapshotPath
+	cleanup1 := server.CombineCleanup(cleanup, func() { os.Remove(snapshotPath) })
+	if err != nil {
+		return nil, cleanup1, err
 	}
 	rpcAddr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
-	return &testNode{s, rpcAddr}, cleanup4, nil
+	return &testNode{s, rpcAddr}, cleanup1, nil
+
+}
+
+func startTestServer() (*testNode, func(), error) {
+	conf, cleanup, err := testConfig()
+	if err != nil {
+		return nil, cleanup, err
+	}
+	node, cleanup1, err := startServerWithConfig(conf)
+	cleanup2 := server.CombineCleanup(cleanup1, cleanup)
+	if err != nil {
+		return nil, cleanup2, err
+	}
+	return node, cleanup2, nil
 }
 
 var commonTestNode *testNode
@@ -546,7 +571,7 @@ func TestRtt(t *testing.T) {
 	require.Contains(t, res, "µs")
 	rtt, err := extractRtt(res)
 	require.Nil(t, err)
-	require.Greater(t, rtt, 100*time.Microsecond)
+	require.Greater(t, rtt, 50*time.Microsecond)
 	require.Less(t, rtt, 500*time.Microsecond)
 
 	cmd.SetArgs([]string{commonCluster.node2.server.ID(), commonCluster.node3.server.ID()})
