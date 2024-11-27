@@ -2,12 +2,16 @@ package main
 
 import (
 	"bytes"
+	"net"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/mbver/cserf/cmd/utils"
+	"github.com/mbver/cserf/rpc/server"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestServer_Start_EventJoin(t *testing.T) {
@@ -95,4 +99,44 @@ func TestServer_KeyringFile_NoKey(t *testing.T) {
 	defer cleanup1()
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "required at least 1 key")
+}
+
+func createConfigFileFromConfig(conf *server.ServerConfig, filename string) error {
+	fh, err := os.OpenFile(filename, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+	ybytes, err := yaml.Marshal(conf)
+	if err != nil {
+		return err
+	}
+	_, err = fh.Write(ybytes)
+	if err != nil {
+		return err
+	}
+	return fh.Close()
+}
+
+func TestServer_CommandRun(t *testing.T) {
+	configFile := "./server_run_conf.yaml"
+	conf, cleanup, err := testConfig()
+	defer cleanup()
+	require.Nil(t, err)
+	createConfigFileFromConfig(conf, configFile)
+	defer os.Remove(configFile)
+
+	cmd := ServerCommand()
+	cmd.Flags().Set(FlagConfig, configFile)
+	out := bytes.Buffer{}
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	go func() {
+		cmd.Execute()
+	}()
+	time.Sleep(100 * time.Millisecond)
+	res := out.String()
+
+	addr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
+	require.Contains(t, res, addr)
 }

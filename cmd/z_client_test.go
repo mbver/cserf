@@ -17,14 +17,17 @@ import (
 	"github.com/mbver/cserf/rpc/pb"
 	"github.com/mbver/cserf/rpc/server"
 	"github.com/mbver/mlist/testaddr"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
 var rpcPort int32 = 50050
 
 const (
-	certPath = "./cert.pem"
-	keyPath  = "./priv.key"
+	certPath   = "./cert.pem"
+	keyPath    = "./priv.key"
+	scriptname = "eventscript.sh"
+	keyfile    = "keyring.json"
 )
 
 func nextRpcPort() int {
@@ -53,23 +56,11 @@ func testConfig() (*server.ServerConfig, func(), error) {
 	conf.SerfConfig.SnapshotPath = snapshotPath // skip auto-join
 	conf.ClusterName = ""                       // skip auto-join
 
-	scriptname := fmt.Sprintf("%s_eventscript.sh", ip.String())
-	err = utils.CreateTestEventScript("./", scriptname)
-	if err != nil {
-		return nil, cleanup, err
-	}
 	conf.SerfConfig.EventScript = fmt.Sprintf("./%s", scriptname)
-	cleanup1 := server.CombineCleanup(func() { os.Remove(scriptname) }, cleanup)
 
-	keyfilename := fmt.Sprintf("%s.keyring.json", ip.String())
-	err = utils.CreateTestKeyringFile("./", keyfilename, []string{"T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="})
-	if err != nil {
-		return nil, cleanup1, err
-	}
-	conf.SerfConfig.KeyringFile = keyfilename
-	cleanup2 := server.CombineCleanup(func() { os.Remove(keyfilename) }, cleanup1)
+	conf.SerfConfig.KeyringFile = keyfile
 
-	return conf, cleanup2, err
+	return conf, cleanup, err
 }
 
 func startServerWithConfig(conf *server.ServerConfig) (*testNode, func(), error) {
@@ -101,6 +92,18 @@ var commonTestNode *testNode
 var commonCluster *threeNodeCluster
 
 func TestMain(m *testing.M) {
+	err := utils.CreateTestEventScript("./", scriptname)
+	if err != nil {
+		panic(err)
+	}
+	defer os.Remove(scriptname)
+
+	err = utils.CreateTestKeyringFile("./", keyfile, []string{"T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="})
+	if err != nil {
+		panic(err)
+	}
+	defer os.Remove(keyfile)
+
 	os.Setenv("SERF_RPC_AUTH", "st@rship")
 	defer os.Unsetenv("SERF_RPC_AUTH")
 
@@ -129,14 +132,19 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
+func captureOutput(cmd *cobra.Command) *bytes.Buffer {
+	out := &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	return out
+}
+
 func TestInfo(t *testing.T) {
 	cmd := InfoCommand()
 	cmd.Flags().Set(FlagRpcAddr, commonTestNode.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
+	out := captureOutput(cmd)
 	cmd.Execute()
 
 	addr, err := commonTestNode.server.SerfAddress()
@@ -155,9 +163,7 @@ func TestActive(t *testing.T) {
 	cmd.Flags().Set(FlagRpcAddr, commonTestNode.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
+	out := captureOutput(cmd)
 	cmd.Execute()
 
 	addr, err := commonTestNode.server.SerfAddress()
@@ -562,22 +568,18 @@ func TestRtt(t *testing.T) {
 	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 	cmd.SetArgs([]string{commonCluster.node2.server.ID()})
-	out := bytes.Buffer{}
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
+	out := captureOutput(cmd)
 	cmd.Execute()
 
 	res := out.String()
 	require.Contains(t, res, "µs")
 	rtt, err := extractRtt(res)
 	require.Nil(t, err)
-	require.Greater(t, rtt, 50*time.Microsecond)
+	require.Greater(t, rtt, 100*time.Microsecond)
 	require.Less(t, rtt, 500*time.Microsecond)
 
 	cmd.SetArgs([]string{commonCluster.node2.server.ID(), commonCluster.node3.server.ID()})
-	out = bytes.Buffer{}
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
+	out = captureOutput(cmd)
 	cmd.Execute()
 
 	res = out.String()
@@ -611,9 +613,7 @@ func TestMonitor(t *testing.T) {
 	cmd := MonitorCommand()
 	cmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
+	out := captureOutput(cmd)
 	go func() {
 		cmd.Execute()
 	}()
@@ -634,9 +634,7 @@ func TestMonitor(t *testing.T) {
 	cmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 	cmd.Flags().Set(FlagEventFilter, "action")
-	out1 := bytes.Buffer{}
-	cmd.SetOut(&out1)
-	cmd.SetErr(&out1)
+	out1 := captureOutput(cmd)
 	go func() {
 		cmd.Execute()
 	}()
@@ -655,9 +653,7 @@ func TestMonitor(t *testing.T) {
 	cmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 	cmd.Flags().Set(FlagEventFilter, "member-join,member-failed,member-reap")
-	out2 := bytes.Buffer{}
-	cmd.SetOut(&out2)
-	cmd.SetErr(&out2)
+	out2 := captureOutput(cmd)
 	go func() {
 		cmd.Execute()
 	}()
@@ -697,9 +693,7 @@ func TestMonitor(t *testing.T) {
 	cmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 	cmd.Flags().Set(FlagLogLevel, "DEBUG")
-	out3 := bytes.Buffer{}
-	cmd.SetOut(&out3)
-	cmd.SetErr(&out3)
+	out3 := captureOutput(cmd)
 	go func() {
 		cmd.Execute()
 	}()
@@ -717,9 +711,7 @@ func TestMonitor(t *testing.T) {
 	cmd.Flags().Set(FlagRpcAddr, s.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 	cmd.Flags().Set(FlagLogLevel, "ERR")
-	out4 := bytes.Buffer{}
-	cmd.SetOut(&out4)
-	cmd.SetErr(&out4)
+	out4 := captureOutput(cmd)
 	go func() {
 		cmd.Execute()
 	}()
