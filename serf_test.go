@@ -42,6 +42,9 @@ func createTestEventScript() (func(), error) {
 	return cleanup, nil
 }
 
+// the script record all event types since a node started.
+// for snapshot-recovery that recovers the min action time,
+// we expect old action will be replayed
 func createTestSnapshotRecoverScript() (func(), error) {
 	cleanup := func() {}
 	tmp, err := os.CreateTemp("", "*script.sh")
