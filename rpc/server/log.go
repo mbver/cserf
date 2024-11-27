@@ -63,7 +63,7 @@ func (r *ringLogBuf) dump(s *logStreamer) {
 	for i := 0; i < len(r.buf); i++ {
 		j := (r.idx + i) % len(r.buf)
 		if r.buf[j] == "" {
-			return
+			continue
 		}
 		s.Stream(r.buf[j])
 	}
