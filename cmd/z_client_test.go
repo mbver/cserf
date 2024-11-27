@@ -531,7 +531,6 @@ func TestQuery(t *testing.T) {
 	cmd.Execute()
 
 	res = out4.String()
-	fmt.Println(res)
 	require.NotContains(t, res, "response from")
 	require.Contains(t, res, "total number of responses: 0")
 	require.NotContains(t, res, "error")

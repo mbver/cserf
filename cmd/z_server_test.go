@@ -10,6 +10,7 @@ import (
 
 	"github.com/mbver/cserf/cmd/utils"
 	"github.com/mbver/cserf/rpc/server"
+	"github.com/mbver/mlist/testaddr"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -126,17 +127,154 @@ func TestServer_CommandRun(t *testing.T) {
 	createConfigFileFromConfig(conf, configFile)
 	defer os.Remove(configFile)
 
-	cmd := ServerCommand()
-	cmd.Flags().Set(FlagConfig, configFile)
+	sCmd := ServerCommand()
+	sCmd.Flags().Set(FlagConfig, configFile)
 	out := bytes.Buffer{}
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
+	sCmd.SetOut(&out)
+	sCmd.SetErr(&out)
 	go func() {
-		cmd.Execute()
+		sCmd.Execute()
 	}()
 	time.Sleep(100 * time.Millisecond)
 	res := out.String()
 
-	addr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
-	require.Contains(t, res, addr)
+	rpcAddr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
+	require.Contains(t, res, rpcAddr)
+	require.NotContains(t, res, "error")
+
+	mCmd := MembersCommand()
+	mCmd.Flags().Set(FlagRpcAddr, rpcAddr)
+	mCmd.Flags().Set(FlagCertPath, certPath)
+	out1 := captureOutput(mCmd)
+	mCmd.Execute()
+
+	res = out1.String()
+
+	bindAddr := net.JoinHostPort(conf.MemberlistConfig.BindAddr, strconv.Itoa(conf.MemberlistConfig.BindPort))
+	require.Contains(t, res, bindAddr)
+	require.Contains(t, res, "alive")
+}
+
+func TestServer_CommandRun_StartJoin(t *testing.T) {
+	node1, cleanup, err := startTestServer()
+	defer cleanup()
+	require.Nil(t, err)
+
+	bindAddr, err := node1.server.SerfAddress()
+	require.Nil(t, err)
+
+	configFile := "./start_join_conf.yaml"
+	conf, cleanup1, err := testConfig()
+	conf.StartJoin = []string{bindAddr}
+	defer cleanup1()
+	require.Nil(t, err)
+	createConfigFileFromConfig(conf, configFile)
+	defer os.Remove(configFile)
+
+	sCmd := ServerCommand()
+	sCmd.Flags().Set(FlagConfig, configFile)
+	out := bytes.Buffer{}
+	sCmd.SetOut(&out)
+	sCmd.SetErr(&out)
+	go func() {
+		sCmd.Execute()
+	}()
+	time.Sleep(100 * time.Millisecond)
+	res := out.String()
+
+	rpcAddr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
+	require.Contains(t, res, rpcAddr)
+	require.NotContains(t, res, "error")
+
+	mCmd := MembersCommand()
+	mCmd.Flags().Set(FlagRpcAddr, rpcAddr)
+	mCmd.Flags().Set(FlagCertPath, certPath)
+	out1 := captureOutput(mCmd)
+	mCmd.Execute()
+
+	res = out1.String()
+
+	bindAddr1 := net.JoinHostPort(conf.MemberlistConfig.BindAddr, strconv.Itoa(conf.MemberlistConfig.BindPort))
+	require.Contains(t, res, bindAddr)
+	require.Contains(t, res, bindAddr1)
+	require.Contains(t, res, "alive")
+}
+
+func TestServer_CommandRun_JoinFail(t *testing.T) {
+	ip, cleanup := testaddr.BindAddrs.NextAvailAddr()
+	defer cleanup()
+	bindAddr := net.JoinHostPort(ip.String(), "7946")
+
+	configFile := "./start_join_failed_conf.yaml"
+	conf, cleanup1, err := testConfig()
+	defer cleanup1()
+	require.Nil(t, err)
+	conf.StartJoin = []string{bindAddr}
+	createConfigFileFromConfig(conf, configFile)
+	defer os.Remove(configFile)
+
+	sCmd := ServerCommand()
+	sCmd.Flags().Set(FlagConfig, configFile)
+	out := bytes.Buffer{}
+	sCmd.SetOut(&out)
+	sCmd.SetErr(&out)
+	go func() {
+		sCmd.Execute()
+	}()
+	time.Sleep(100 * time.Millisecond)
+	res := out.String()
+
+	rpcAddr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
+	require.Contains(t, res, rpcAddr)
+	require.NotContains(t, res, "error")
+
+	mCmd := MembersCommand()
+	mCmd.Flags().Set(FlagRpcAddr, rpcAddr)
+	mCmd.Flags().Set(FlagCertPath, certPath)
+	out1 := captureOutput(mCmd)
+	mCmd.Execute()
+
+	res = out1.String()
+
+	bindAddr1 := net.JoinHostPort(conf.MemberlistConfig.BindAddr, strconv.Itoa(conf.MemberlistConfig.BindPort))
+	require.NotContains(t, res, bindAddr)
+	require.Contains(t, res, bindAddr1)
+	require.Contains(t, res, "alive")
+}
+
+func TestServer_CommandRun_AdvertiseAddress(t *testing.T) {
+	configFile := "./cmd_run_adv_addr_conf.yaml"
+	conf, cleanup1, err := testConfig()
+	defer cleanup1()
+	require.Nil(t, err)
+	advAdrr := "172.211.21.21"
+	conf.MemberlistConfig.AdvertiseAddr = advAdrr
+	createConfigFileFromConfig(conf, configFile)
+	defer os.Remove(configFile)
+
+	sCmd := ServerCommand()
+	sCmd.Flags().Set(FlagConfig, configFile)
+	out := bytes.Buffer{}
+	sCmd.SetOut(&out)
+	sCmd.SetErr(&out)
+	go func() {
+		sCmd.Execute()
+	}()
+	time.Sleep(100 * time.Millisecond)
+	res := out.String()
+
+	rpcAddr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
+	require.Contains(t, res, rpcAddr)
+	require.NotContains(t, res, "error")
+
+	mCmd := MembersCommand()
+	mCmd.Flags().Set(FlagRpcAddr, rpcAddr)
+	mCmd.Flags().Set(FlagCertPath, certPath)
+	out1 := captureOutput(mCmd)
+	mCmd.Execute()
+
+	res = out1.String()
+
+	require.Contains(t, res, advAdrr)
+	require.Contains(t, res, "alive")
 }
