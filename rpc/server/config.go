@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	serf "github.com/mbver/cserf"
 	memberlist "github.com/mbver/mlist"
@@ -13,21 +14,24 @@ import (
 )
 
 type ServerConfig struct {
-	RpcAddress       string             `yaml:"rpc_addr"`
-	RpcPort          int                `yaml:"rpc_port"`
-	LogOutput        string             `yaml:"log_output"`
-	LogPrefix        string             `yaml:"log_prefix"`
-	LogLevel         string             `yaml:"log_level"`
-	SyslogFacility   string             `yaml:"syslog_facility"`
-	CertPath         string             `yaml:"cert_path"`
-	KeyPath          string             `yaml:"key_path"`
-	AuthKeyHash      string             `yaml:"auth_key_hash"`
-	ClusterName      string             `yaml:"cluster_name"`
-	NetInterface     string             `yaml:"net_interface"` // iface has to be valid or empty
-	IgnoreOld        bool               `yaml:"ignore_old"`
-	StartJoin        []string           `yaml:"start_join"`
-	MemberlistConfig *memberlist.Config `yaml:"memberlist_config"`
-	SerfConfig       *serf.Config       `yaml:"serf_config"`
+	RpcAddress        string             `yaml:"rpc_addr"`
+	RpcPort           int                `yaml:"rpc_port"`
+	LogOutput         string             `yaml:"log_output"`
+	LogPrefix         string             `yaml:"log_prefix"`
+	LogLevel          string             `yaml:"log_level"`
+	SyslogFacility    string             `yaml:"syslog_facility"`
+	CertPath          string             `yaml:"cert_path"`
+	KeyPath           string             `yaml:"key_path"`
+	AuthKeyHash       string             `yaml:"auth_key_hash"`
+	ClusterName       string             `yaml:"cluster_name"`
+	NetInterface      string             `yaml:"net_interface"` // iface has to be valid or empty
+	IgnoreOld         bool               `yaml:"ignore_old"`
+	StartJoin         []string           `yaml:"start_join"`
+	RetryJoins        []string           `yaml:"retry_joins"` // these nodes must be joined successfully
+	RetryJoinMax      int                `yaml:"retry_join_max"`
+	RetryJoinInterval time.Duration      `yaml:"retry_join_interval"`
+	MemberlistConfig  *memberlist.Config `yaml:"memberlist_config"`
+	SerfConfig        *serf.Config       `yaml:"serf_config"`
 }
 
 func DefaultServerConfig() *ServerConfig {

@@ -320,3 +320,91 @@ func TestServer_CommandRun_Mdns(t *testing.T) {
 	require.Contains(t, res, bindAddr1)
 	require.Contains(t, res, bindAddr2)
 }
+
+func TestServer_CommandRun_RetryJoin(t *testing.T) {
+	configFile1 := "./cmd_run_retry_1_conf.yaml"
+	conf, cleanup1, err := testConfig()
+	defer cleanup1()
+	require.Nil(t, err)
+	createConfigFileFromConfig(conf, configFile1)
+	defer os.Remove(configFile1)
+	sCmd := ServerCommand()
+	sCmd.Flags().Set(FlagConfig, configFile1)
+	out1 := captureOutput(sCmd)
+	go func() {
+		sCmd.Execute()
+	}()
+	time.Sleep(100 * time.Millisecond)
+	res := out1.String()
+
+	rpcAddr1 := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
+	require.Contains(t, res, rpcAddr1)
+	require.NotContains(t, res, "error")
+
+	bindAddr1 := net.JoinHostPort(conf.MemberlistConfig.BindAddr, strconv.Itoa(conf.MemberlistConfig.BindPort))
+
+	configFile2 := "./cmd_run_retry_2_conf.yaml"
+	conf, cleanup2, err := testConfig()
+	defer cleanup2()
+	require.Nil(t, err)
+
+	conf.RetryJoins = []string{bindAddr1}
+	conf.RetryJoinMax = 1
+	conf.RetryJoinInterval = 25 * time.Millisecond
+
+	createConfigFileFromConfig(conf, configFile2)
+	defer os.Remove(configFile2)
+	sCmd = ServerCommand()
+	sCmd.Flags().Set(FlagConfig, configFile2)
+	out2 := captureOutput(sCmd)
+	go func() {
+		sCmd.Execute()
+	}()
+	time.Sleep(100 * time.Millisecond)
+	res = out2.String()
+
+	rpcAddr2 := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
+	require.Contains(t, res, rpcAddr2)
+	require.NotContains(t, res, "error")
+
+	bindAddr2 := net.JoinHostPort(conf.MemberlistConfig.BindAddr, strconv.Itoa(conf.MemberlistConfig.BindPort))
+
+	mCmd := MembersCommand()
+	mCmd.Flags().Set(FlagRpcAddr, rpcAddr2)
+	mCmd.Flags().Set(FlagCertPath, certPath)
+	out3 := captureOutput(mCmd)
+	mCmd.Execute()
+
+	res = out3.String()
+	require.Contains(t, res, bindAddr1)
+	require.Contains(t, res, bindAddr2)
+}
+
+func TestServer_CommandRun_RetryJoinFailed(t *testing.T) {
+	ip, cleanup := testaddr.BindAddrs.NextAvailAddr()
+	defer cleanup()
+
+	bindAddr1 := net.JoinHostPort(ip.String(), "7946")
+
+	configFile2 := "./cmd_run_retry_fail_conf.yaml"
+	conf, cleanup2, err := testConfig()
+	defer cleanup2()
+	require.Nil(t, err)
+
+	conf.RetryJoins = []string{bindAddr1}
+	conf.RetryJoinMax = 1
+	conf.RetryJoinInterval = 25 * time.Millisecond
+
+	createConfigFileFromConfig(conf, configFile2)
+	defer os.Remove(configFile2)
+	sCmd := ServerCommand()
+	sCmd.Flags().Set(FlagConfig, configFile2)
+	out2 := captureOutput(sCmd)
+	go func() {
+		sCmd.Execute()
+	}()
+	time.Sleep(100 * time.Millisecond)
+	res := out2.String()
+	require.Contains(t, res, "failed to rejoin")
+	require.Contains(t, res, "exitting")
+}

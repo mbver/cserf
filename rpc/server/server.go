@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	serf "github.com/mbver/cserf"
 	"github.com/mbver/cserf/rpc/pb"
@@ -143,7 +144,30 @@ func createSerf(conf *ServerConfig, logger *log.Logger) (*serf.Serf, error) {
 	if len(conf.StartJoin) > 0 {
 		s.Join(conf.StartJoin, conf.IgnoreOld)
 	}
+	go retryJoin(s, conf, logger)
 	return s, nil
+}
+
+func retryJoin(s *serf.Serf, conf *ServerConfig, logger *log.Logger) {
+	if len(conf.RetryJoins) == 0 {
+		return
+	}
+	if conf.RetryJoinMax == 0 {
+		conf.RetryJoinMax = 1
+	}
+	if conf.RetryJoinInterval == 0 {
+		conf.RetryJoinInterval = 1 * time.Second
+	}
+	for i := 0; i < conf.RetryJoinMax; i++ {
+		n, err := s.Join(conf.RetryJoins, conf.IgnoreOld)
+		if err == nil {
+			logger.Printf("[INFO] server: successfully rejoin with %d nodes", n)
+			return
+		}
+		time.Sleep(conf.RetryJoinInterval)
+	}
+	logger.Printf("[ERR] server: maximum retry join attempts failed, exiting...")
+	s.Shutdown()
 }
 
 func (s *Server) ID() string {
@@ -156,6 +180,10 @@ func (s *Server) SerfAddress() (string, error) {
 
 func (s *Server) Shutdown() {
 	s.serf.Shutdown()
+}
+
+func (s *Server) State() serf.SerfStateType {
+	return s.serf.State()
 }
 
 func (s *Server) Connect(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
