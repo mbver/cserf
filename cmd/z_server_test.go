@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"net"
 	"os"
 	"strconv"
@@ -19,9 +18,7 @@ func TestServer_Start_EventJoin(t *testing.T) {
 	cmd := MonitorCommand()
 	cmd.Flags().Set(FlagRpcAddr, commonTestNode.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
+	out := captureOutput(cmd)
 	go func() {
 		cmd.Execute()
 	}()
@@ -74,9 +71,7 @@ func TestServer_KeyringFile_Keysloaded(t *testing.T) {
 	kCmd.Flags().Set(FlagRpcAddr, node.rpcAddr)
 	kCmd.Flags().Set(FlagCertPath, certPath)
 	kCmd.SetArgs([]string{"list"})
-	out := bytes.Buffer{}
-	kCmd.SetOut(&out)
-	kCmd.SetErr(&out)
+	out := captureOutput(kCmd)
 
 	kCmd.Execute()
 	res := out.String()
@@ -129,9 +124,7 @@ func TestServer_CommandRun(t *testing.T) {
 
 	sCmd := ServerCommand()
 	sCmd.Flags().Set(FlagConfig, configFile)
-	out := bytes.Buffer{}
-	sCmd.SetOut(&out)
-	sCmd.SetErr(&out)
+	out := captureOutput(sCmd)
 	go func() {
 		sCmd.Execute()
 	}()
@@ -173,9 +166,7 @@ func TestServer_CommandRun_StartJoin(t *testing.T) {
 
 	sCmd := ServerCommand()
 	sCmd.Flags().Set(FlagConfig, configFile)
-	out := bytes.Buffer{}
-	sCmd.SetOut(&out)
-	sCmd.SetErr(&out)
+	out := captureOutput(sCmd)
 	go func() {
 		sCmd.Execute()
 	}()
@@ -215,9 +206,7 @@ func TestServer_CommandRun_JoinFail(t *testing.T) {
 
 	sCmd := ServerCommand()
 	sCmd.Flags().Set(FlagConfig, configFile)
-	out := bytes.Buffer{}
-	sCmd.SetOut(&out)
-	sCmd.SetErr(&out)
+	out := captureOutput(sCmd)
 	go func() {
 		sCmd.Execute()
 	}()
@@ -251,12 +240,9 @@ func TestServer_CommandRun_AdvertiseAddress(t *testing.T) {
 	conf.MemberlistConfig.AdvertiseAddr = advAdrr
 	createConfigFileFromConfig(conf, configFile)
 	defer os.Remove(configFile)
-
 	sCmd := ServerCommand()
 	sCmd.Flags().Set(FlagConfig, configFile)
-	out := bytes.Buffer{}
-	sCmd.SetOut(&out)
-	sCmd.SetErr(&out)
+	out := captureOutput(sCmd)
 	go func() {
 		sCmd.Execute()
 	}()
@@ -277,4 +263,60 @@ func TestServer_CommandRun_AdvertiseAddress(t *testing.T) {
 
 	require.Contains(t, res, advAdrr)
 	require.Contains(t, res, "alive")
+}
+
+func TestServer_CommandRun_Mdns(t *testing.T) {
+	configFile1 := "./cmd_run_mdns_1_conf.yaml"
+	conf, cleanup1, err := testConfig()
+	defer cleanup1()
+	require.Nil(t, err)
+	conf.ClusterName = "sparrow"
+	createConfigFileFromConfig(conf, configFile1)
+	defer os.Remove(configFile1)
+	sCmd := ServerCommand()
+	sCmd.Flags().Set(FlagConfig, configFile1)
+	out1 := captureOutput(sCmd)
+	go func() {
+		sCmd.Execute()
+	}()
+	time.Sleep(100 * time.Millisecond)
+	res := out1.String()
+
+	rpcAddr1 := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
+	require.Contains(t, res, rpcAddr1)
+	require.NotContains(t, res, "error")
+
+	bindAddr1 := net.JoinHostPort(conf.MemberlistConfig.BindAddr, strconv.Itoa(conf.MemberlistConfig.BindPort))
+
+	configFile2 := "./cmd_run_mdns_2_conf.yaml"
+	conf, cleanup2, err := testConfig()
+	defer cleanup2()
+	require.Nil(t, err)
+	conf.ClusterName = "sparrow"
+	createConfigFileFromConfig(conf, configFile2)
+	defer os.Remove(configFile2)
+	sCmd = ServerCommand()
+	sCmd.Flags().Set(FlagConfig, configFile2)
+	out2 := captureOutput(sCmd)
+	go func() {
+		sCmd.Execute()
+	}()
+	time.Sleep(100 * time.Millisecond)
+	res = out2.String()
+
+	rpcAddr2 := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
+	require.Contains(t, res, rpcAddr2)
+	require.NotContains(t, res, "error")
+
+	bindAddr2 := net.JoinHostPort(conf.MemberlistConfig.BindAddr, strconv.Itoa(conf.MemberlistConfig.BindPort))
+
+	mCmd := MembersCommand()
+	mCmd.Flags().Set(FlagRpcAddr, rpcAddr2)
+	mCmd.Flags().Set(FlagCertPath, certPath)
+	out3 := captureOutput(mCmd)
+	mCmd.Execute()
+
+	res = out3.String()
+	require.Contains(t, res, bindAddr1)
+	require.Contains(t, res, bindAddr2)
 }

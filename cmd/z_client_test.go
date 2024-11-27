@@ -53,6 +53,7 @@ func testConfig() (*server.ServerConfig, func(), error) {
 	conf.KeyPath = keyPath
 	conf.LogPrefix = fmt.Sprintf("serf-%s: ", ip.String())
 	snapshotPath := fmt.Sprintf("%s.snap", conf.MemberlistConfig.BindAddr)
+	cleanup1 := server.CombineCleanup(cleanup, func() { os.Remove(snapshotPath) })
 	conf.SerfConfig.SnapshotPath = snapshotPath // skip auto-join
 	conf.ClusterName = ""                       // skip auto-join
 
@@ -60,18 +61,16 @@ func testConfig() (*server.ServerConfig, func(), error) {
 
 	conf.SerfConfig.KeyringFile = keyfile
 
-	return conf, cleanup, err
+	return conf, cleanup1, err
 }
 
 func startServerWithConfig(conf *server.ServerConfig) (*testNode, func(), error) {
 	s, cleanup, err := server.CreateServer(conf)
-	snapshotPath := conf.SerfConfig.SnapshotPath
-	cleanup1 := server.CombineCleanup(cleanup, func() { os.Remove(snapshotPath) })
 	if err != nil {
-		return nil, cleanup1, err
+		return nil, cleanup, err
 	}
 	rpcAddr := net.JoinHostPort(conf.RpcAddress, strconv.Itoa(conf.RpcPort))
-	return &testNode{s, rpcAddr}, cleanup1, nil
+	return &testNode{s, rpcAddr}, cleanup, nil
 
 }
 
