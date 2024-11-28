@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -212,15 +213,14 @@ func (s *Serf) setupScriptCmd(script string, output *circbuf.Buffer) *exec.Cmd {
 		shell = "cmd"
 		flag = "/C"
 	}
-
 	cmd := exec.Command(shell, flag, script)
 
 	cmd.Stderr = output
 	cmd.Stdout = output
 
 	cmd.Env = append(os.Environ(),
-		"SERF_SELF_ID="+s.ID(),
-		"SERF_SELF_ROLE="+s.getTag("role"),
+		"SERF_LOCAL_ID="+s.ID(),
+		"SERF_LOCAL_ROLE="+s.getTag("role"),
 	)
 
 	// add serf_tag_X env
@@ -238,7 +238,6 @@ func (s *Serf) invokeEventScript(script string, event Event) error {
 	output, _ := circbuf.NewBuffer(maxScriptOutputSize)
 	cmd := s.setupScriptCmd(script, output)
 	cmd.Env = append(cmd.Env, "SERF_EVENT="+event.EventType().String())
-
 	// to send payload to cmd
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -261,18 +260,16 @@ func (s *Serf) invokeEventScript(script string, event Event) error {
 	}
 
 	// Start a timer to warn about slow handlers
-	slowTimer := time.AfterFunc(slowScriptTimeout, func() {
+	warnSlowScript := time.AfterFunc(slowScriptTimeout, func() {
 		s.logger.Printf("[WARN] serf: Script '%s' slow, execution exceeding %v",
 			script, slowScriptTimeout)
 	})
-
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 
 	err = cmd.Wait()
-	slowTimer.Stop()
-
+	warnSlowScript.Stop()
 	// Warn if buffer is overritten
 	if output.TotalWritten() > output.Size() {
 		s.logger.Printf("[WARN] serf: Script '%s' generated %d bytes of output, truncated to %d",
@@ -285,11 +282,10 @@ func (s *Serf) invokeEventScript(script string, event Event) error {
 	if err != nil {
 		return err
 	}
-
 	// If this is a query and we have output, respond
 	if q, ok := event.(*QueryEvent); ok && output.TotalWritten() > 0 {
 		if err := s.respondToQueryEvent(q, output.Bytes()); err != nil {
-			s.logger.Printf("[ERR] serf: failed to respond to query")
+			s.logger.Printf("[ERR] serf: failed to respond to query %v", err)
 		}
 	}
 	return nil
@@ -301,22 +297,46 @@ func escapeWhiteSpace(s string) string {
 	return s
 }
 
-func decodeAndConcatTags(tags []byte) (map[string]string, string, error) {
+type kvPair struct {
+	k, v string
+}
+
+func (p *kvPair) String() string {
+	return fmt.Sprintf("%s=%s", p.k, p.v)
+}
+
+func toKVPairs(m map[string]string) []*kvPair {
+	res := make([]*kvPair, 0, len(m))
+	for k, v := range m {
+		res = append(res, &kvPair{k, v})
+	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].k < res[j].k
+	})
+	return res
+}
+
+func toKVPairsString(m map[string]string) string {
+	kvs := toKVPairs(m)
+	strs := make([]string, len(kvs))
+	for i, p := range kvs {
+		strs[i] = p.String()
+	}
+	return strings.Join(strs, ",")
+}
+
+func decodeAndConcatTags(tags []byte) (string, string, error) {
 	m, err := decodeTags(tags)
 	if err != nil {
-		return nil, "", err
+		return "", "", err
 	}
-	kvs := []string{}
-	for k, v := range m {
-		kvs = append(kvs, fmt.Sprintf("%s=%s", k, v))
-	}
-	return m, strings.Join(kvs, ","), nil
+	return m["role"], toKVPairsString(m), nil
 }
 
 func stdinMemberData(logger *log.Logger, stdin io.WriteCloser, e *CoalescedMemberEvent) {
 	defer stdin.Close()
 	for _, m := range e.Members {
-		tagMap, tags, err := decodeAndConcatTags(m.Tags)
+		role, tags, err := decodeAndConcatTags(m.Tags)
 		if err != nil {
 			logger.Printf("[ERR] serf invoke-event-script: failed to decode tags %v", err)
 			return
@@ -325,7 +345,7 @@ func stdinMemberData(logger *log.Logger, stdin io.WriteCloser, e *CoalescedMembe
 			"%s\t%s\t%s\t%s\n",
 			m.ID,
 			m.IP.String(),
-			escapeWhiteSpace(tagMap["role"]),
+			escapeWhiteSpace(role),
 			escapeWhiteSpace(tags),
 		)))
 		if err != nil {
