@@ -50,6 +50,15 @@ message ReachResponse {
     repeated string acked = 3;
 }
 
+message TagFilter {
+    string key = 1;
+    string expr = 2;
+}
+
+message MemberRequest {
+    repeated TagFilter tag_filters = 1;
+}
+
 message Member {
     string id = 1;
     string addr = 2;
@@ -99,7 +108,7 @@ service Serf{
     rpc action(ActionRequest) returns (Empty);
     rpc reach(Empty) returns (ReachResponse);
     rpc active(Empty) returns (MembersResponse);
-    rpc members(Empty) returns (MembersResponse);
+    rpc members(MemberRequest) returns (MembersResponse);
     rpc join(JoinRequest) returns (IntValue);
     rpc leave(Empty) returns (Empty);
     rpc rtt(RttRequest) returns (google.protobuf.Duration);

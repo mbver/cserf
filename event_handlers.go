@@ -326,7 +326,7 @@ func toKVPairsString(m map[string]string) string {
 }
 
 func decodeAndConcatTags(tags []byte) (string, string, error) {
-	m, err := decodeTags(tags)
+	m, err := DecodeTags(tags)
 	if err != nil {
 		return "", "", err
 	}

@@ -29,7 +29,7 @@ type SerfClient interface {
 	Action(ctx context.Context, in *ActionRequest, opts ...grpc.CallOption) (*Empty, error)
 	Reach(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ReachResponse, error)
 	Active(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MembersResponse, error)
-	Members(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MembersResponse, error)
+	Members(ctx context.Context, in *MemberRequest, opts ...grpc.CallOption) (*MembersResponse, error)
 	Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*IntValue, error)
 	Leave(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	Rtt(ctx context.Context, in *RttRequest, opts ...grpc.CallOption) (*durationpb.Duration, error)
@@ -123,7 +123,7 @@ func (c *serfClient) Active(ctx context.Context, in *Empty, opts ...grpc.CallOpt
 	return out, nil
 }
 
-func (c *serfClient) Members(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MembersResponse, error) {
+func (c *serfClient) Members(ctx context.Context, in *MemberRequest, opts ...grpc.CallOption) (*MembersResponse, error) {
 	out := new(MembersResponse)
 	err := c.cc.Invoke(ctx, "/pb.Serf/members", in, out, opts...)
 	if err != nil {
@@ -219,7 +219,7 @@ type SerfServer interface {
 	Action(context.Context, *ActionRequest) (*Empty, error)
 	Reach(context.Context, *Empty) (*ReachResponse, error)
 	Active(context.Context, *Empty) (*MembersResponse, error)
-	Members(context.Context, *Empty) (*MembersResponse, error)
+	Members(context.Context, *MemberRequest) (*MembersResponse, error)
 	Join(context.Context, *JoinRequest) (*IntValue, error)
 	Leave(context.Context, *Empty) (*Empty, error)
 	Rtt(context.Context, *RttRequest) (*durationpb.Duration, error)
@@ -251,7 +251,7 @@ func (UnimplementedSerfServer) Reach(context.Context, *Empty) (*ReachResponse, e
 func (UnimplementedSerfServer) Active(context.Context, *Empty) (*MembersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Active not implemented")
 }
-func (UnimplementedSerfServer) Members(context.Context, *Empty) (*MembersResponse, error) {
+func (UnimplementedSerfServer) Members(context.Context, *MemberRequest) (*MembersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Members not implemented")
 }
 func (UnimplementedSerfServer) Join(context.Context, *JoinRequest) (*IntValue, error) {
@@ -397,7 +397,7 @@ func _Serf_Active_Handler(srv interface{}, ctx context.Context, dec func(interfa
 }
 
 func _Serf_Members_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
+	in := new(MemberRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -409,7 +409,7 @@ func _Serf_Members_Handler(srv interface{}, ctx context.Context, dec func(interf
 		FullMethod: "/pb.Serf/members",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SerfServer).Members(ctx, req.(*Empty))
+		return srv.(SerfServer).Members(ctx, req.(*MemberRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

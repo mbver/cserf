@@ -13,9 +13,9 @@ import (
 )
 
 func TestCoalescer_Basic(t *testing.T) {
-	enc0, err := encodeTags(map[string]string{"role": "lb"})
+	enc0, err := EncodeTags(map[string]string{"role": "lb"})
 	require.Nil(t, err)
-	enc1, err := encodeTags(map[string]string{"role": "db"})
+	enc1, err := EncodeTags(map[string]string{"role": "db"})
 	require.Nil(t, err)
 
 	events := []MemberEvent{
@@ -89,9 +89,9 @@ func TestCoalescer_Basic(t *testing.T) {
 }
 
 func TestCoalescer_TagUpdate(t *testing.T) {
-	enc0, err := encodeTags(map[string]string{"role": "lb"})
+	enc0, err := EncodeTags(map[string]string{"role": "lb"})
 	require.Nil(t, err)
-	enc1, err := encodeTags(map[string]string{"role": "db"})
+	enc1, err := EncodeTags(map[string]string{"role": "db"})
 	require.Nil(t, err)
 
 	inCh := make(chan Event, 10)

@@ -511,7 +511,7 @@ func TestSerf_SetTags(t *testing.T) {
 	changed, msg := retry(5, func() (bool, string) {
 		time.Sleep(10 * time.Millisecond)
 		n1 := s2.mlist.GetNodeState(s1.ID())
-		tags, err := decodeTags(n1.Node.Tags)
+		tags, err := DecodeTags(n1.Node.Tags)
 		require.Nil(t, err)
 		if tags["port"] != "8000" {
 			return false, "wrong tags: " + tags["port"]
@@ -527,7 +527,7 @@ func TestSerf_SetTags(t *testing.T) {
 	changed, msg = retry(5, func() (bool, string) {
 		time.Sleep(10 * time.Millisecond)
 		n2 := s1.mlist.GetNodeState(s2.ID())
-		tags, err := decodeTags(n2.Node.Tags)
+		tags, err := DecodeTags(n2.Node.Tags)
 		require.Nil(t, err)
 		if tags["datacenter"] != "east-aws" {
 			return false, "wrong tags: " + tags["port"]
@@ -642,7 +642,7 @@ func TestSerf_LeaveJoinDifferentRole(t *testing.T) {
 		if node == nil {
 			return false, "node not exist"
 		}
-		tags, err := decodeTags(node.Node.Tags)
+		tags, err := DecodeTags(node.Node.Tags)
 		require.Nil(t, err)
 		if tags["role"] != "bar" {
 			return false, "wrong role"
@@ -666,13 +666,13 @@ func TestSerf_Role(t *testing.T) {
 
 	found, msg := retry(5, func() (bool, string) {
 		n1 := s2.mlist.GetNodeState(s1.ID())
-		tags, err := decodeTags(n1.Node.Tags)
+		tags, err := DecodeTags(n1.Node.Tags)
 		require.Nil(t, err)
 		if tags["role"] != "web" {
 			return false, "role for node 1 wrong: " + tags["role"]
 		}
 		n2 := s1.mlist.GetNodeState(s2.ID())
-		tags, err = decodeTags(n2.Node.Tags)
+		tags, err = DecodeTags(n2.Node.Tags)
 		require.Nil(t, err)
 		if tags["role"] != "lb" {
 			return false, "role for node 2 wrong: " + tags["role"]
@@ -753,9 +753,8 @@ func TestSerf_LocalMember(t *testing.T) {
 
 	n := s.LocalMember()
 	require.Equal(t, n.ID, s.ID())
-	tags := ToTagMap(n.Tags)
 	require.Nil(t, err)
-	require.True(t, reflect.DeepEqual(tags, s.tags))
+	require.True(t, reflect.DeepEqual(n.Tags, s.tags))
 	newTags := map[string]string{
 		"foo": "bar",
 		"tea": "milk",
@@ -764,9 +763,8 @@ func TestSerf_LocalMember(t *testing.T) {
 	require.Nil(t, err)
 
 	n = s.LocalMember()
-	tags = ToTagMap(n.Tags)
 	require.Nil(t, err)
-	require.True(t, reflect.DeepEqual(tags, newTags))
+	require.True(t, reflect.DeepEqual(n.Tags, newTags))
 }
 
 func retry(times int, fn func() (bool, string)) (success bool, msg string) {

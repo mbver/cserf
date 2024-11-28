@@ -280,7 +280,7 @@ func TestScriptHandler_MemberEvent(t *testing.T) {
 	require.Nil(t, err)
 
 	tags := map[string]string{"role": "balancer", "job": "off-balance"}
-	encoded, err := encodeTags(tags)
+	encoded, err := EncodeTags(tags)
 	require.Nil(t, err)
 	s.inEventCh <- &MemberEvent{
 		Type: EventMemberJoin,

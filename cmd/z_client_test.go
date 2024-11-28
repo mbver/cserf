@@ -183,18 +183,70 @@ func TestMembers(t *testing.T) {
 	cmd.Flags().Set(FlagRpcAddr, commonTestNode.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 
-	out := captureOutput(cmd)
-	cmd.Execute()
-
 	addr, err := commonTestNode.server.SerfAddress()
 	require.Nil(t, err)
 
-	res := out.String()
-	require.Contains(t, res, addr)
-	require.Contains(t, res, commonTestNode.server.ID())
-	require.Contains(t, res, "members")
-	require.Contains(t, res, "alive")
-	require.NotContains(t, res, "error")
+	t.Run("no tag filters", func(t *testing.T) {
+		out := captureOutput(cmd)
+		cmd.Execute()
+
+		res := out.String()
+		require.Contains(t, res, addr)
+		require.Contains(t, res, commonTestNode.server.ID())
+		require.Contains(t, res, "members")
+		require.Contains(t, res, "alive")
+		require.NotContains(t, res, "error")
+	})
+
+	t.Run("with matching filter", func(t *testing.T) {
+		cmd.Flags().Set(FlagTag, "role=some*")
+		out := captureOutput(cmd)
+		cmd.Execute()
+
+		res := out.String()
+		require.Contains(t, res, addr)
+		require.Contains(t, res, commonTestNode.server.ID())
+		require.Contains(t, res, "members")
+		require.Contains(t, res, "alive")
+		require.NotContains(t, res, "error")
+	})
+
+	t.Run("with non-matching filter", func(t *testing.T) {
+		cmd.Flags().Set(FlagTag, "role=otherrole")
+		out := captureOutput(cmd)
+		cmd.Execute()
+
+		res := out.String()
+		require.Contains(t, res, "members: null")
+	})
+
+	t.Run("invalid input", func(t *testing.T) {
+		cmd.Flags().Set(FlagTag, "role,")
+		out := captureOutput(cmd)
+		cmd.Execute()
+
+		res := out.String()
+		require.Contains(t, res, "invalid tag filter")
+	})
+
+	t.Run("invalid regex", func(t *testing.T) {
+		cmd.Flags().Set(FlagTag, "role=[a")
+		out := captureOutput(cmd)
+		cmd.Execute()
+
+		res := out.String()
+		require.Contains(t, res, "error parsing regexp")
+	})
+
+	t.Run("multiple filters", func(t *testing.T) {
+		cmd.Flags().Set(FlagTag, "role=some*,x=y")
+		out := captureOutput(cmd)
+		cmd.Execute()
+
+		res := out.String()
+		require.Contains(t, res, "members: null")
+		require.NotContains(t, res, "error")
+	})
 }
 
 func TestAction(t *testing.T) {

@@ -134,7 +134,7 @@ func (b *SerfBuilder) Build() (*Serf, error) {
 		s.tags = b.conf.Tags
 	}
 
-	mtags, err := encodeTags(s.tags)
+	mtags, err := EncodeTags(s.tags)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +304,7 @@ func (s *Serf) NumNodes() int {
 type Member struct {
 	ID    string
 	Addr  string
-	Tags  string
+	Tags  map[string]string
 	State string
 	Lives int
 }
@@ -313,14 +313,14 @@ func (s *Serf) Members() []*Member {
 	nodes := s.mlist.Members()
 	members := make([]*Member, 0, len(nodes))
 	for _, n := range nodes {
-		stag, err := ToTagString(n.Node.Tags)
+		tags, err := DecodeTags(n.Node.Tags)
 		if err != nil {
 			s.logger.Printf("[ERR] serf: failed to decode tags %v", err)
 		}
 		members = append(members, &Member{
 			ID:    n.Node.ID,
 			Addr:  n.Node.UDPAddress().String(),
-			Tags:  stag,
+			Tags:  tags,
 			State: n.State.String(),
 			Lives: int(n.Lives),
 		})
@@ -332,14 +332,14 @@ func (s *Serf) ActiveNodes() []*Member {
 	nodes := s.mlist.ActiveNodes()
 	members := make([]*Member, 0, len(nodes))
 	for _, n := range nodes {
-		jtag, err := ToTagString(n.Node.Tags)
+		tags, err := DecodeTags(n.Node.Tags)
 		if err != nil {
 			s.logger.Printf("[ERR] serf: failed to decode tags %v", err)
 		}
 		members = append(members, &Member{
 			ID:    n.Node.ID,
 			Addr:  n.Node.UDPAddress().String(),
-			Tags:  jtag,
+			Tags:  tags,
 			State: n.State.String(),
 			Lives: int(n.Lives),
 		})
@@ -353,7 +353,7 @@ func (s *Serf) NumActive() int {
 
 func (s *Serf) LocalMember() *Member {
 	n := s.mlist.LocalNodeState()
-	tags, err := ToTagString(n.Node.Tags)
+	tags, err := DecodeTags(n.Node.Tags)
 	if err != nil {
 		s.logger.Printf("[ERR] serf: failed to decode tags %v", err)
 	}
@@ -452,7 +452,7 @@ func (s *Serf) schedule() {
 }
 
 func (s *Serf) updateMemberlistTags() error {
-	encoded, err := encodeTags(s.tags)
+	encoded, err := EncodeTags(s.tags)
 	if len(encoded) > memberlist.TagMaxSize { // no need, memberlist can do this!
 		return memberlist.ErrMaxTagSizeExceed
 	}

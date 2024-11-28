@@ -20,7 +20,7 @@ func encode(t msgType, in interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func encodeTags(tags map[string]string) ([]byte, error) {
+func EncodeTags(tags map[string]string) ([]byte, error) {
 	return encode(tagMagicByte, tags)
 }
 
@@ -31,7 +31,7 @@ func decode(buf []byte, out interface{}) error {
 	return dec.Decode(out)
 }
 
-func decodeTags(msg []byte) (map[string]string, error) {
+func DecodeTags(msg []byte) (map[string]string, error) {
 	if len(msg) == 0 {
 		return map[string]string{}, nil
 	}
@@ -53,21 +53,24 @@ func randIntN(n int) int {
 	return int(rand.Uint32() % uint32(n))
 }
 
-func ToTagString(tag []byte) (string, error) {
-	m, err := decodeTags(tag)
-	if err != nil {
-		return "", err
-	}
+func TagMapToString(tags map[string]string) string {
 	buf := &strings.Builder{}
-	for k, v := range m {
+	for k, v := range tags {
 		buf.WriteString(k)
 		buf.WriteString("=")
 		buf.WriteString(v)
 		buf.WriteString(",")
 	}
 	s := buf.String()
-	res := strings.TrimSuffix(s, ",")
-	return res, nil
+	return strings.TrimSuffix(s, ",")
+}
+
+func TagsEncodedToString(tag []byte) (string, error) {
+	m, err := DecodeTags(tag)
+	if err != nil {
+		return "", err
+	}
+	return TagMapToString(m), nil
 }
 
 func ToTagMap(s string) map[string]string {

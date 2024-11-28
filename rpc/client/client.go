@@ -142,10 +142,10 @@ func (c *Client) Active() (*pb.MembersResponse, error) {
 	return c.client.Active(ctx, &pb.Empty{})
 }
 
-func (c *Client) Members() (*pb.MembersResponse, error) {
+func (c *Client) Members(req *pb.MemberRequest) (*pb.MembersResponse, error) {
 	ctx, cancel := defaultCtx()
 	defer cancel()
-	return c.client.Members(ctx, &pb.Empty{})
+	return c.client.Members(ctx, req)
 }
 
 func (c *Client) Join(req *pb.JoinRequest) (*pb.IntValue, error) {

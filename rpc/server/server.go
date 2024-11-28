@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -284,7 +285,7 @@ func toPbMember(n *serf.Member) *pb.Member {
 	return &pb.Member{
 		Id:    n.ID,
 		Addr:  n.Addr,
-		Tags:  n.Tags,
+		Tags:  serf.TagMapToString(n.Tags),
 		State: n.State,
 		Lives: uint32(n.Lives),
 	}
@@ -301,13 +302,55 @@ func (s *Server) Active(ctx context.Context, req *pb.Empty) (*pb.MembersResponse
 	return res, nil
 }
 
-func (s *Server) Members(ctx context.Context, req *pb.Empty) (*pb.MembersResponse, error) {
-	nodes := s.serf.Members()
-	res := &pb.MembersResponse{
-		Members: make([]*pb.Member, len(nodes)),
+type regexFilter struct {
+	key   string
+	regex *regexp.Regexp
+}
+
+func toRegexFilter(f *pb.TagFilter) (*regexFilter, error) {
+	re, err := regexp.Compile(f.Expr)
+	if err != nil {
+		return nil, err
 	}
-	for i, n := range nodes {
-		res.Members[i] = toPbMember(n)
+	return &regexFilter{f.Key, re}, nil
+}
+
+func toRegexFilters(pFilters []*pb.TagFilter) ([]*regexFilter, error) {
+	res := make([]*regexFilter, len(pFilters))
+	for i, f := range pFilters {
+		rFilter, err := toRegexFilter(f)
+		if err != nil {
+			return nil, err
+		}
+		res[i] = rFilter
+	}
+	return res, nil
+}
+
+func matchTag(tags map[string]string, filters []*regexFilter) bool {
+	for _, f := range filters {
+		v := tags[f.key]
+		if !f.regex.Match([]byte(v)) {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Server) Members(ctx context.Context, req *pb.MemberRequest) (*pb.MembersResponse, error) {
+	members := s.serf.Members()
+	res := &pb.MembersResponse{
+		Members: make([]*pb.Member, 0, len(members)),
+	}
+	tagFilters, err := toRegexFilters(req.TagFilters)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range members {
+		if !matchTag(m.Tags, tagFilters) {
+			continue
+		}
+		res.Members = append(res.Members, toPbMember(m))
 	}
 	return res, nil
 }
@@ -390,7 +433,7 @@ func memberEventToString(e *serf.CoalescedMemberEvent) string {
 }
 
 func nodeToString(n *memberlist.Node) string {
-	tags, _ := serf.ToTagString(n.Tags)
+	tags, _ := serf.TagsEncodedToString(n.Tags)
 	addr := n.UDPAddress().String()
 	return fmt.Sprintf("%s - %s - %s", n.ID, addr, tags)
 }
