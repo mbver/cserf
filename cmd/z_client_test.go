@@ -4,6 +4,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"os"
@@ -182,9 +183,7 @@ func TestMembers(t *testing.T) {
 	cmd.Flags().Set(FlagRpcAddr, commonTestNode.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
+	out := captureOutput(cmd)
 	cmd.Execute()
 
 	addr, err := commonTestNode.server.SerfAddress()
@@ -203,9 +202,7 @@ func TestAction(t *testing.T) {
 	cmd.Flags().Set(FlagRpcAddr, commonTestNode.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 	cmd.SetArgs([]string{"abc", "xyz"})
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
+	out := captureOutput(cmd)
 	cmd.Execute()
 
 	res := out.String()
@@ -213,71 +210,95 @@ func TestAction(t *testing.T) {
 	require.NotContains(t, res, "error")
 }
 
+func TestAction_ToFewArgs(t *testing.T) {
+	cmd := ActionCommand()
+	cmd.Flags().Set(FlagRpcAddr, commonTestNode.rpcAddr)
+	cmd.Flags().Set(FlagCertPath, certPath)
+	out := captureOutput(cmd)
+	cmd.Execute()
+
+	res := out.String()
+	fmt.Println(res)
+	require.Contains(t, res, "error")
+	require.Contains(t, res, ErrAtLeastOneArg.Error())
+}
+
 func TestKey(t *testing.T) {
 	node, cleanup, err := startTestServer() // don't mess with the common test server
 	defer cleanup()
 	require.Nil(t, err)
-
+	oldKey := "T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="
 	cmd := KeyCommand()
 	cmd.Flags().Set(FlagRpcAddr, node.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
-	cmd.SetArgs([]string{"list"})
 
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
-	cmd.Execute()
-
-	oldKey := "T9jncgl9mbLus+baTTa7q7nPSUrXwbDi2dhbtqir37s="
-	res := out.String()
-	require.Contains(t, res, "primary_key_count")
-	require.Contains(t, res, oldKey)
-	require.NotContains(t, res, "error")
+	t.Run("test-key-list", func(t *testing.T) {
+		cmd.SetArgs([]string{"list"})
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.Contains(t, res, "primary_key_count")
+		require.Contains(t, res, oldKey)
+		require.NotContains(t, res, "error")
+	})
 
 	newKey := "HvY8ubRZMgafUOWvrOadwOckVa1wN3QWAo46FVKbVN8="
-	cmd.SetArgs([]string{"install", newKey})
-	cmd.Execute()
-	res = out.String()
-	require.NotContains(t, res, "error")
+	t.Run("test-key-use-non-exist", func(t *testing.T) {
+		cmd.SetArgs([]string{"use", newKey})
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.Contains(t, res, `"num_err": 1`)
+		require.Contains(t, res, "not in keyring")
+	})
+	t.Run("test-key-install", func(t *testing.T) {
+		cmd.SetArgs([]string{"install", newKey})
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.NotContains(t, res, "error")
 
-	cmd.SetArgs([]string{"list"})
-	out = bytes.Buffer{}
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
-	cmd.Execute()
+		cmd.SetArgs([]string{"list"})
+		out1 := captureOutput(cmd)
+		cmd.Execute()
+		res = out1.String()
+		require.Contains(t, res, newKey)
+		require.Contains(t, res, oldKey)
 
-	res = out.String()
-	require.Contains(t, res, newKey)
-	require.Contains(t, res, oldKey)
+	})
 
-	cmd.SetArgs([]string{"remove", oldKey})
-	cmd.Execute()
+	t.Run("test-key-remove-primary", func(t *testing.T) {
+		cmd.SetArgs([]string{"remove", oldKey})
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.Contains(t, res, "err_from")
+		require.Contains(t, res, "removing primary key is not allowed")
+	})
 
-	res = out.String()
-	require.Contains(t, res, "err_from")
-	require.Contains(t, res, "removing primary key is not allowed")
+	t.Run("test-key-use", func(t *testing.T) {
+		cmd.SetArgs([]string{"use", newKey})
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.NotContains(t, "error", res)
+	})
 
-	cmd.SetArgs([]string{"use", newKey})
-	cmd.Execute()
-	res = out.String()
-	require.NotContains(t, "error", res)
+	t.Run("test-key-remove-non-primary", func(t *testing.T) {
+		cmd.SetArgs(([]string{"remove", oldKey}))
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.NotContains(t, res, "error")
 
-	cmd.SetArgs(([]string{"remove", oldKey}))
-	cmd.Execute()
-
-	res = out.String()
-	require.NotContains(t, res, "error")
-
-	cmd.SetArgs([]string{"list"})
-	out = bytes.Buffer{}
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
-	cmd.Execute()
-
-	res = out.String()
-	require.NotContains(t, res, oldKey)
-	require.Contains(t, res, newKey)
-	require.NotContains(t, res, "error")
+		cmd.SetArgs([]string{"list"})
+		out1 := captureOutput(cmd)
+		cmd.Execute()
+		res = out1.String()
+		require.NotContains(t, res, oldKey)
+		require.Contains(t, res, newKey)
+		require.NotContains(t, res, "error")
+	})
 }
 
 func TestTags(t *testing.T) {
@@ -436,9 +457,7 @@ func TestJoin(t *testing.T) {
 	cmd.Flags().Set(FlagCertPath, "./cert.pem")
 	cmd.SetArgs([]string{addr2, addr3})
 
-	out := bytes.Buffer{}
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
+	out := captureOutput(cmd)
 	cmd.Execute()
 
 	res := out.String()
@@ -447,6 +466,15 @@ func TestJoin(t *testing.T) {
 	require.NotContains(t, res, "error")
 }
 
+func TestJoin_NoAddr(t *testing.T) {
+	cmd := JoinCommand()
+	out := captureOutput(cmd)
+	cmd.Execute()
+
+	res := out.String()
+	require.Contains(t, res, "error")
+	require.Contains(t, res, ErrAtLeastOneArg.Error())
+}
 func TestQuery(t *testing.T) {
 	id1 := commonCluster.node1.server.ID()
 	id2 := commonCluster.node2.server.ID()
@@ -721,4 +749,20 @@ func TestMonitor(t *testing.T) {
 
 	res = out4.String()
 	require.NotContains(t, res, "INFO")
+}
+
+func TestKeyGen(t *testing.T) {
+	cmd := KeyGenCommand()
+	out := captureOutput(cmd)
+	cmd.Execute()
+	res := out.String()
+	fmt.Println(res)
+
+	re := regexp.MustCompile(`"([^"]+)"`)
+	match := re.FindStringSubmatch(res)
+	require.Greater(t, len(match), 1)
+	encoded := match[1]
+	key, err := base64.StdEncoding.DecodeString(encoded)
+	require.Nil(t, err)
+	require.Equal(t, 32, len(key))
 }
