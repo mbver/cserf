@@ -57,6 +57,7 @@ message TagFilter {
 
 message MemberRequest {
     repeated TagFilter tag_filters = 1;
+    string status_filter = 2;
 }
 
 message Member {
@@ -107,7 +108,6 @@ service Serf{
     rpc key(KeyRequest) returns (KeyResponse);
     rpc action(ActionRequest) returns (Empty);
     rpc reach(Empty) returns (ReachResponse);
-    rpc active(Empty) returns (MembersResponse);
     rpc members(MemberRequest) returns (MembersResponse);
     rpc join(JoinRequest) returns (IntValue);
     rpc leave(Empty) returns (Empty);

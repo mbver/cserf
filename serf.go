@@ -305,7 +305,7 @@ type Member struct {
 	ID    string
 	Addr  string
 	Tags  map[string]string
-	State string
+	State memberlist.StateType
 	Lives int
 }
 
@@ -321,26 +321,7 @@ func (s *Serf) Members() []*Member {
 			ID:    n.Node.ID,
 			Addr:  n.Node.UDPAddress().String(),
 			Tags:  tags,
-			State: n.State.String(),
-			Lives: int(n.Lives),
-		})
-	}
-	return members
-}
-
-func (s *Serf) ActiveNodes() []*Member {
-	nodes := s.mlist.ActiveNodes()
-	members := make([]*Member, 0, len(nodes))
-	for _, n := range nodes {
-		tags, err := DecodeTags(n.Node.Tags)
-		if err != nil {
-			s.logger.Printf("[ERR] serf: failed to decode tags %v", err)
-		}
-		members = append(members, &Member{
-			ID:    n.Node.ID,
-			Addr:  n.Node.UDPAddress().String(),
-			Tags:  tags,
-			State: n.State.String(),
+			State: n.State,
 			Lives: int(n.Lives),
 		})
 	}
@@ -361,7 +342,7 @@ func (s *Serf) LocalMember() *Member {
 		ID:    n.Node.ID,
 		Addr:  n.Node.UDPAddress().String(),
 		Tags:  tags,
-		State: n.State.String(),
+		State: n.State,
 		Lives: int(n.Lives),
 	}
 }

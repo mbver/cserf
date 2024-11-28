@@ -28,7 +28,6 @@ type SerfClient interface {
 	Key(ctx context.Context, in *KeyRequest, opts ...grpc.CallOption) (*KeyResponse, error)
 	Action(ctx context.Context, in *ActionRequest, opts ...grpc.CallOption) (*Empty, error)
 	Reach(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ReachResponse, error)
-	Active(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MembersResponse, error)
 	Members(ctx context.Context, in *MemberRequest, opts ...grpc.CallOption) (*MembersResponse, error)
 	Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*IntValue, error)
 	Leave(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
@@ -108,15 +107,6 @@ func (c *serfClient) Action(ctx context.Context, in *ActionRequest, opts ...grpc
 func (c *serfClient) Reach(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ReachResponse, error) {
 	out := new(ReachResponse)
 	err := c.cc.Invoke(ctx, "/pb.Serf/reach", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *serfClient) Active(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MembersResponse, error) {
-	out := new(MembersResponse)
-	err := c.cc.Invoke(ctx, "/pb.Serf/active", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +208,6 @@ type SerfServer interface {
 	Key(context.Context, *KeyRequest) (*KeyResponse, error)
 	Action(context.Context, *ActionRequest) (*Empty, error)
 	Reach(context.Context, *Empty) (*ReachResponse, error)
-	Active(context.Context, *Empty) (*MembersResponse, error)
 	Members(context.Context, *MemberRequest) (*MembersResponse, error)
 	Join(context.Context, *JoinRequest) (*IntValue, error)
 	Leave(context.Context, *Empty) (*Empty, error)
@@ -247,9 +236,6 @@ func (UnimplementedSerfServer) Action(context.Context, *ActionRequest) (*Empty, 
 }
 func (UnimplementedSerfServer) Reach(context.Context, *Empty) (*ReachResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Reach not implemented")
-}
-func (UnimplementedSerfServer) Active(context.Context, *Empty) (*MembersResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Active not implemented")
 }
 func (UnimplementedSerfServer) Members(context.Context, *MemberRequest) (*MembersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Members not implemented")
@@ -374,24 +360,6 @@ func _Serf_Reach_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SerfServer).Reach(ctx, req.(*Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Serf_Active_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SerfServer).Active(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pb.Serf/active",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SerfServer).Active(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -547,10 +515,6 @@ var Serf_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "reach",
 			Handler:    _Serf_Reach_Handler,
-		},
-		{
-			MethodName: "active",
-			Handler:    _Serf_Active_Handler,
 		},
 		{
 			MethodName: "members",

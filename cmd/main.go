@@ -33,7 +33,6 @@ func main() {
 	cmd.AddCommand(KeyCommand())
 	cmd.AddCommand(ActionCommand())
 	cmd.AddCommand(QueryCommand())
-	cmd.AddCommand(ActiveCommand())
 	cmd.AddCommand(ReachCommand())
 	cmd.AddCommand(MembersCommand())
 	cmd.AddCommand(JoinCommand())

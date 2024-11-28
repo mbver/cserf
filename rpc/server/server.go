@@ -286,20 +286,9 @@ func toPbMember(n *serf.Member) *pb.Member {
 		Id:    n.ID,
 		Addr:  n.Addr,
 		Tags:  serf.TagMapToString(n.Tags),
-		State: n.State,
+		State: n.State.String(),
 		Lives: uint32(n.Lives),
 	}
-}
-
-func (s *Server) Active(ctx context.Context, req *pb.Empty) (*pb.MembersResponse, error) {
-	nodes := s.serf.ActiveNodes()
-	res := &pb.MembersResponse{
-		Members: make([]*pb.Member, len(nodes)),
-	}
-	for i, n := range nodes {
-		res.Members[i] = toPbMember(n)
-	}
-	return res, nil
 }
 
 type regexFilter struct {
@@ -337,6 +326,59 @@ func matchTag(tags map[string]string, filters []*regexFilter) bool {
 	return true
 }
 
+type statusFilter struct {
+	status string
+}
+
+func isActive(state memberlist.StateType) bool {
+	return state != memberlist.StateDead && state != memberlist.StateLeft
+}
+
+func (f *statusFilter) match(state memberlist.StateType) bool {
+	switch f.status {
+	case "active":
+		return isActive(state)
+	case "inactive":
+		return !isActive(state)
+	case "failed":
+		return state == memberlist.StateDead
+	case "left":
+		return state == memberlist.StateLeft
+	}
+	return true
+}
+
+func isValidStatusFilter(s string) bool {
+	return s == "active" || s == "inactive" || s == "failed" || s == "left"
+}
+
+func toStatusFilters(str string) ([]*statusFilter, error) {
+	if len(str) == 0 {
+		return []*statusFilter{}, nil
+	}
+	split := strings.Split(str, ",")
+	res := make([]*statusFilter, 0, len(split))
+	for _, s := range split {
+		if !isValidStatusFilter(s) {
+			return nil, fmt.Errorf("invalid status filter: %s", s)
+		}
+		res = append(res, &statusFilter{s})
+	}
+	return res, nil
+}
+
+func matchStatus(state memberlist.StateType, filters []*statusFilter) bool {
+	if len(filters) == 0 {
+		return true
+	}
+	for _, f := range filters {
+		if f.match(state) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) Members(ctx context.Context, req *pb.MemberRequest) (*pb.MembersResponse, error) {
 	members := s.serf.Members()
 	res := &pb.MembersResponse{
@@ -346,8 +388,15 @@ func (s *Server) Members(ctx context.Context, req *pb.MemberRequest) (*pb.Member
 	if err != nil {
 		return nil, err
 	}
+	statusFilters, err := toStatusFilters(req.StatusFilter)
+	if err != nil {
+		return nil, err
+	}
 	for _, m := range members {
 		if !matchTag(m.Tags, tagFilters) {
+			continue
+		}
+		if !matchStatus(m.State, statusFilters) {
 			continue
 		}
 		res.Members = append(res.Members, toPbMember(m))

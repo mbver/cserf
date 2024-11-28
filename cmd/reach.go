@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mbver/cserf/cmd/utils"
+	"github.com/mbver/cserf/rpc/pb"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +27,10 @@ func ReachCommand() *cobra.Command {
 				out.Info("client closed")
 			}()
 
-			actives, err := gClient.Active()
+			actives, err := gClient.Members(&pb.MemberRequest{
+				TagFilters:   []*pb.TagFilter{},
+				StatusFilter: "active",
+			})
 			if err != nil {
 				out.Error(err)
 			}

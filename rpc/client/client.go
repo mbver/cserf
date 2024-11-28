@@ -136,12 +136,6 @@ func (c *Client) Reach() (*pb.ReachResponse, error) {
 	return c.client.Reach(ctx, &pb.Empty{})
 }
 
-func (c *Client) Active() (*pb.MembersResponse, error) {
-	ctx, cancel := defaultCtx()
-	defer cancel()
-	return c.client.Active(ctx, &pb.Empty{})
-}
-
 func (c *Client) Members(req *pb.MemberRequest) (*pb.MembersResponse, error) {
 	ctx, cancel := defaultCtx()
 	defer cancel()

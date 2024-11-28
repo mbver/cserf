@@ -158,26 +158,6 @@ func TestInfo(t *testing.T) {
 	require.NotContains(t, res, "error")
 }
 
-func TestActive(t *testing.T) {
-	cmd := ActiveCommand()
-	cmd.Flags().Set(FlagRpcAddr, commonTestNode.rpcAddr)
-	cmd.Flags().Set(FlagCertPath, certPath)
-
-	out := captureOutput(cmd)
-	cmd.Execute()
-
-	addr, err := commonTestNode.server.SerfAddress()
-	require.Nil(t, err)
-
-	res := out.String()
-	require.Contains(t, res, addr)
-	require.Contains(t, res, commonTestNode.server.ID())
-	require.Contains(t, res, "active")
-	require.Contains(t, res, "alive")
-	require.Contains(t, res, "role=something")
-	require.NotContains(t, res, "error")
-}
-
 func TestMembers(t *testing.T) {
 	cmd := MembersCommand()
 	cmd.Flags().Set(FlagRpcAddr, commonTestNode.rpcAddr)
@@ -198,7 +178,18 @@ func TestMembers(t *testing.T) {
 		require.NotContains(t, res, "error")
 	})
 
-	t.Run("with matching filter", func(t *testing.T) {
+	t.Run("no tag filters with matching status", func(t *testing.T) {
+		out := captureOutput(cmd)
+		cmd.Flags().Set(FlagStatus, "active")
+		cmd.Execute()
+		res := out.String()
+		require.Contains(t, res, addr)
+		require.Contains(t, res, commonTestNode.server.ID())
+		require.Contains(t, res, "members")
+		require.Contains(t, res, "alive")
+		require.NotContains(t, res, "error")
+	})
+	t.Run("with matching tag filter and status", func(t *testing.T) {
 		cmd.Flags().Set(FlagTag, "role=some*")
 		out := captureOutput(cmd)
 		cmd.Execute()
@@ -220,7 +211,7 @@ func TestMembers(t *testing.T) {
 		require.Contains(t, res, "members: null")
 	})
 
-	t.Run("invalid input", func(t *testing.T) {
+	t.Run("invalid tag filter input", func(t *testing.T) {
 		cmd.Flags().Set(FlagTag, "role,")
 		out := captureOutput(cmd)
 		cmd.Execute()
@@ -238,7 +229,7 @@ func TestMembers(t *testing.T) {
 		require.Contains(t, res, "error parsing regexp")
 	})
 
-	t.Run("multiple filters", func(t *testing.T) {
+	t.Run("multiple tag filters", func(t *testing.T) {
 		cmd.Flags().Set(FlagTag, "role=some*,x=y")
 		out := captureOutput(cmd)
 		cmd.Execute()
@@ -246,6 +237,40 @@ func TestMembers(t *testing.T) {
 		res := out.String()
 		require.Contains(t, res, "members: null")
 		require.NotContains(t, res, "error")
+	})
+
+	t.Run("multiple status filters, 1 matching", func(t *testing.T) {
+		cmd.Flags().Set(FlagTag, "")
+		cmd.Flags().Set(FlagStatus, "active,left")
+		out := captureOutput(cmd)
+		cmd.Execute()
+
+		res := out.String()
+		require.Contains(t, res, addr)
+		require.Contains(t, res, commonTestNode.server.ID())
+		require.Contains(t, res, "members")
+		require.Contains(t, res, "alive")
+		require.NotContains(t, res, "error")
+	})
+
+	t.Run("multiple status filters, no matching", func(t *testing.T) {
+		cmd.Flags().Set(FlagStatus, "failed,left")
+		out := captureOutput(cmd)
+		cmd.Execute()
+
+		res := out.String()
+		require.Contains(t, res, "members: null")
+		require.NotContains(t, res, "error")
+	})
+
+	t.Run("invalid status filter", func(t *testing.T) {
+		cmd.Flags().Set(FlagStatus, "awesome")
+		out := captureOutput(cmd)
+		cmd.Execute()
+
+		res := out.String()
+		require.Contains(t, res, "error")
+		require.Contains(t, res, "invalid status filter")
 	})
 }
 
@@ -429,9 +454,10 @@ func TestLeave(t *testing.T) {
 	require.Contains(t, res, "leave successfully")
 
 	time.Sleep(100 * time.Millisecond)
-	cmd = ActiveCommand()
+	cmd = MembersCommand()
 	cmd.Flags().Set(FlagRpcAddr, node.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
+	cmd.Flags().Set(FlagStatus, "active")
 
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -439,7 +465,7 @@ func TestLeave(t *testing.T) {
 
 	res = out.String()
 	require.NotContains(t, res, "error")
-	require.Contains(t, res, "active-members: null")
+	require.Contains(t, res, "members: null")
 }
 
 type threeNodeCluster struct {

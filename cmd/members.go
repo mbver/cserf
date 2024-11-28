@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const FlagStatus = "status"
+
 func MembersCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "members",
@@ -36,8 +38,10 @@ func MembersCommand() *cobra.Command {
 				out.Error(err)
 				return
 			}
+			statusFilter := vp.GetString(FlagStatus)
 			res, err := gClient.Members(&pb.MemberRequest{
-				TagFilters: tagFilters,
+				TagFilters:   tagFilters,
+				StatusFilter: statusFilter,
 			})
 			if err != nil {
 				out.Error(err)
@@ -48,7 +52,8 @@ func MembersCommand() *cobra.Command {
 	}
 	cmd.Flags().String(FlagRpcAddr, "0.0.0.0:50051", "address of grpc server to connect")
 	cmd.Flags().String(FlagCertPath, "./cert", "path to x059 certificate file")
-	cmd.Flags().String(FlagTag, "", "tags filters, in the form k1=expr1,k2=expr2")
+	cmd.Flags().String(FlagTag, "", "tags filters, in the form <k1=expr1,k2=expr2>")
+	cmd.Flags().String(FlagStatus, "", "status filters, in the form <f1,f2,fn>. only active, inactive,failed and left is accepted")
 	return cmd
 }
 
