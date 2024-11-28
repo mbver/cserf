@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/mbver/cserf/cmd/utils"
@@ -28,10 +29,18 @@ func QueryCommand() *cobra.Command {
 			vp := viper.New()
 			vp.BindPFlags(cmd.Flags())
 			name := vp.GetString(FlagName)
+			if name == "" {
+				out.Error(fmt.Errorf("query name is required"))
+				return
+			}
 			nodeStr := vp.GetString(FlagNodeFilter)
 			tagStr := vp.GetString(FlagTag)
 			timeout := vp.GetDuration(FlagTimeout)
 			relay := vp.GetInt(FlagRelay)
+			if relay > 255 {
+				out.Error(fmt.Errorf("relay factor exceeds limit: %d/%d", relay, 255))
+				return
+			}
 			payload := vp.GetString(FlagPayload)
 			p := toQueryParams(name, nodeStr, tagStr, timeout, relay, payload)
 

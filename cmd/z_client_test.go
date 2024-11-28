@@ -558,87 +558,88 @@ func TestQuery(t *testing.T) {
 	id2 := commonCluster.node2.server.ID()
 	id3 := commonCluster.node3.server.ID()
 
-	// no filter
 	cmd := QueryCommand()
 	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
 	cmd.Flags().Set(FlagCertPath, certPath)
 
-	out := bytes.Buffer{}
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
-	cmd.Execute()
+	t.Run("no name", func(t *testing.T) {
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.Contains(t, res, "error")
+		require.Contains(t, res, "query name is required")
+	})
+	cmd.Flags().Set(FlagName, "uptime")
 
-	res := out.String()
-	require.Contains(t, res, id1)
-	require.Contains(t, res, id2)
-	require.Contains(t, res, id3)
-	require.Contains(t, res, "total number of responses: 3")
-	require.NotContains(t, res, "error")
+	t.Run("relay too big", func(t *testing.T) {
+		cmd.Flags().Set(FlagRelay, "1000")
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.Contains(t, res, "error")
+		require.Contains(t, res, "relay factor exceeds limit")
+	})
+	cmd.Flags().Set(FlagRelay, "")
 
-	// node filter
-	cmd = QueryCommand()
-	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
-	cmd.Flags().Set(FlagCertPath, certPath)
+	t.Run("no filter", func(t *testing.T) {
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.Contains(t, res, id1)
+		require.Contains(t, res, id2)
+		require.Contains(t, res, id3)
+		require.Contains(t, res, "total number of responses: 3")
+		require.NotContains(t, res, "error")
+	})
 
-	cmd.Flags().Set(FlagNodeFilter, fmt.Sprintf("%s,%s", id2, id3))
-	out1 := bytes.Buffer{}
-	cmd.SetOut(&out1)
-	cmd.SetErr(&out1)
-	cmd.Execute()
+	t.Run("node filter", func(t *testing.T) {
+		cmd.Flags().Set(FlagNodeFilter, fmt.Sprintf("%s,%s", id2, id3))
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.NotContains(t, res, id1)
+		require.Contains(t, res, id2)
+		require.Contains(t, res, id3)
+		require.Contains(t, res, "total number of responses: 2")
+		require.NotContains(t, res, "error")
 
-	res = out1.String()
-	require.NotContains(t, res, id1)
-	require.Contains(t, res, id2)
-	require.Contains(t, res, id3)
-	require.Contains(t, res, "total number of responses: 2")
-	require.NotContains(t, res, "error")
+	})
 
-	// role filter
-	cmd = QueryCommand()
-	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
-	cmd.Flags().Set(FlagCertPath, certPath)
-	cmd.Flags().Set(FlagTag, "role=superstar")
-	out2 := bytes.Buffer{}
-	cmd.SetOut(&out2)
-	cmd.SetErr(&out2)
-	cmd.Execute()
+	t.Run("role filter - no matching", func(t *testing.T) {
+		cmd.Flags().Set(FlagNodeFilter, "")
+		cmd.Flags().Set(FlagTag, "role=superstar")
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.NotContains(t, res, "response from")
+		require.Contains(t, res, "total number of responses: 0")
+		require.NotContains(t, res, "error")
+	})
 
-	res = out2.String()
-	require.NotContains(t, res, "response from")
-	require.Contains(t, res, "total number of responses: 0")
-	require.NotContains(t, res, "error")
+	t.Run("role filter - matching", func(t *testing.T) {
+		cmd.Flags().Set(FlagNodeFilter, "")
+		cmd.Flags().Set(FlagTag, "role=something")
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.Contains(t, res, id1)
+		require.Contains(t, res, id2)
+		require.Contains(t, res, id3)
+		require.Contains(t, res, "total number of responses: 3")
+		require.NotContains(t, res, "error")
+	})
 
-	// role filter
-	cmd = QueryCommand()
-	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
-	cmd.Flags().Set(FlagCertPath, certPath)
-	cmd.Flags().Set(FlagTag, "role=something")
-	out3 := bytes.Buffer{}
-	cmd.SetOut(&out3)
-	cmd.SetErr(&out3)
-	cmd.Execute()
+	t.Run("role filter - multiple", func(t *testing.T) {
+		cmd.Flags().Set(FlagNodeFilter, "")
+		cmd.Flags().Set(FlagTag, "role=something,name=x")
+		out := captureOutput(cmd)
+		cmd.Execute()
+		res := out.String()
+		require.NotContains(t, res, "response from")
+		require.Contains(t, res, "total number of responses: 0")
+		require.NotContains(t, res, "error")
+	})
 
-	res = out3.String()
-	require.Contains(t, res, id1)
-	require.Contains(t, res, id2)
-	require.Contains(t, res, id3)
-	require.Contains(t, res, "total number of responses: 3")
-	require.NotContains(t, res, "error")
-
-	// role filter
-	cmd = QueryCommand()
-	cmd.Flags().Set(FlagRpcAddr, commonCluster.node1.rpcAddr)
-	cmd.Flags().Set(FlagCertPath, certPath)
-	cmd.Flags().Set(FlagTag, "role=something,name=x")
-	out4 := bytes.Buffer{}
-	cmd.SetOut(&out4)
-	cmd.SetErr(&out4)
-	cmd.Execute()
-
-	res = out4.String()
-	require.NotContains(t, res, "response from")
-	require.Contains(t, res, "total number of responses: 0")
-	require.NotContains(t, res, "error")
 }
 
 func TestReach(t *testing.T) {
