@@ -9,7 +9,7 @@ require (
 	github.com/hashicorp/go-msgpack/v2 v2.1.2
 	github.com/hashicorp/go-syslog v1.0.0
 	github.com/hashicorp/logutils v1.0.0
-	github.com/mbver/mlist v0.0.0-20241128025603-6151ff0f97b6
+	github.com/mbver/mlist v0.0.0-20241128085511-852be1427b51
 	github.com/mbver/mmdns v0.0.0-20240710115102-12a2c9be617a
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
@@ -18,7 +18,6 @@ require (
 	google.golang.org/grpc v1.67.1
 	google.golang.org/protobuf v1.35.1
 	gopkg.in/yaml.v3 v3.0.1
-	sigs.k8s.io/yaml v1.4.0
 )
 
 require (

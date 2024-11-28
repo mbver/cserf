@@ -9,7 +9,6 @@ github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHk
 github.com/frankban/quicktest v1.14.6/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
 github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nosvA=
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
-github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
@@ -34,10 +33,8 @@ github.com/magiconair/properties v1.8.7 h1:IeQXZAiQcpL9mgcAe1Nu6cX9LLw6ExEHKjN0V
 github.com/magiconair/properties v1.8.7/go.mod h1:Dhd985XPs7jluiymwWYZ0G4Z61jb3vdS329zhj2hYo0=
 github.com/mbver/heap v0.0.0-20241007110110-d59c4b01d442 h1:vWUiufZn4NF93waSLM12HktvYMKMPCYfOv0OFgxD1B8=
 github.com/mbver/heap v0.0.0-20241007110110-d59c4b01d442/go.mod h1:UXpEPhzoZp9GVfNgPNkw8NBZYk9SvIGZQYiavvi50Xc=
-github.com/mbver/mlist v0.0.0-20241127082131-8959dff89d1a h1:uRZCSHrIwpdTJ52UaB9RthGD1tg+YlYUL/9GqmiN9/I=
-github.com/mbver/mlist v0.0.0-20241127082131-8959dff89d1a/go.mod h1:aJLdZCQSc7A6rOi7qyW9rNknsCMp0UKzcp66m2NAeNs=
-github.com/mbver/mlist v0.0.0-20241128025603-6151ff0f97b6 h1:HRmwiwnsgDW2rSWC6Nw1i2/tzL0ovEdJbVsfO3WL3NE=
-github.com/mbver/mlist v0.0.0-20241128025603-6151ff0f97b6/go.mod h1:aJLdZCQSc7A6rOi7qyW9rNknsCMp0UKzcp66m2NAeNs=
+github.com/mbver/mlist v0.0.0-20241128085511-852be1427b51 h1:NL0F9dRQpE57MuTq8byIwKKBD2czyAIn7/MHcnFQV3k=
+github.com/mbver/mlist v0.0.0-20241128085511-852be1427b51/go.mod h1:aJLdZCQSc7A6rOi7qyW9rNknsCMp0UKzcp66m2NAeNs=
 github.com/mbver/mmdns v0.0.0-20240710115102-12a2c9be617a h1:sr3DRT35TRdzhSmlsspAd+ViHYgYdo9lbxvaVEEOVF0=
 github.com/mbver/mmdns v0.0.0-20240710115102-12a2c9be617a/go.mod h1:yfCVhtWP9ysBVItML8LY8IY7PyfjD/SLdoiUrXTqW8k=
 github.com/miekg/dns v1.1.62 h1:cN8OuEF1/x5Rq6Np+h1epln8OiyPWV+lROx9LxcGgIQ=
@@ -116,5 +113,3 @@ gopkg.in/ini.v1 v1.67.0/go.mod h1:pNLf8WUiyNEtQjuu5G5vTm06TEv9tsIgeAvK8hOrP4k=
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-sigs.k8s.io/yaml v1.4.0 h1:Mk1wCc2gy/F0THH0TAp1QYyJNzRm2KCLy3o5ASXVI5E=
-sigs.k8s.io/yaml v1.4.0/go.mod h1:Ejl7/uTz7PSA4eKMyQCUTnhZYNmLIl+5c2lQPGR2BPY=

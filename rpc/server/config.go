@@ -44,6 +44,8 @@ func DefaultServerConfig() *ServerConfig {
 		SyslogFacility:   "",
 		CertPath:         "./cert.pem",
 		KeyPath:          "./priv.key",
+		StartJoin:        []string{},
+		RetryJoins:       []string{},
 		MemberlistConfig: memberlist.DefaultLANConfig(),
 		SerfConfig:       serf.DefaultConfig(),
 	}

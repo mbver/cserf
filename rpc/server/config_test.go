@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 func TestConfig_Load(t *testing.T) {
@@ -15,6 +15,7 @@ func TestConfig_Load(t *testing.T) {
 	require.Nil(t, err)
 
 	path := "./testconf.yaml"
+	defer os.Remove(path)
 	fh, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	require.Nil(t, err)
 	_, err = fh.Write(ybytes)

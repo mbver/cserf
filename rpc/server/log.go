@@ -122,11 +122,15 @@ var syslogPriorityMap = map[string]gsyslog.Priority{
 	"CRIT":  gsyslog.LOG_CRIT,
 }
 
-type Syslog struct {
+type FilterSyslog struct {
+	filter *logutils.LevelFilter
 	logger gsyslog.Syslogger
 }
 
-func (s *Syslog) Write(p []byte) (int, error) {
+func (s *FilterSyslog) Write(p []byte) (int, error) {
+	if !s.filter.Check(p) {
+		return 0, nil
+	}
 	// Extract log level
 	var level string
 	afterLevel := p
@@ -189,13 +193,15 @@ func createLogger(
 		if err != nil {
 			return nil, err
 		}
-		syslog := &Syslog{logger}
-		filterSyslog := &logutils.LevelFilter{
-			Levels:   LogLevels,
-			MinLevel: level,
-			Writer:   syslog,
+
+		fsyslog := &FilterSyslog{
+			filter: &logutils.LevelFilter{
+				Levels:   LogLevels,
+				MinLevel: level,
+			},
+			logger: logger,
 		}
-		fanOutOutput = io.MultiWriter(filterOutput, filterSyslog, streamer)
+		fanOutOutput = io.MultiWriter(filterOutput, fsyslog, streamer)
 	}
 
 	// use a slice of io.Writer and spread it out later
