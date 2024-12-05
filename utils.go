@@ -2,12 +2,25 @@ package serf
 
 import (
 	"bytes"
+	crand "crypto/rand"
 	"fmt"
+	"math"
+	"math/big"
 	"math/rand"
 	"strings"
 
 	"github.com/hashicorp/go-msgpack/v2/codec"
 )
+
+var rnd = rand.New(rand.NewSource(newSeed()))
+
+func newSeed() int64 {
+	r, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		panic(fmt.Errorf("failed to read random bytes: %v", err))
+	}
+	return r.Int64()
+}
 
 func encode(t msgType, in interface{}) ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
@@ -50,7 +63,7 @@ func randIntN(n int) int {
 	if n == 0 { // if n == 0, modulo will panic
 		return 0
 	}
-	return int(rand.Uint32() % uint32(n))
+	return int(rnd.Uint32() % uint32(n))
 }
 
 func TagMapToString(tags map[string]string) string {

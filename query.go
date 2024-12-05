@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -148,7 +147,7 @@ func (s *Serf) Query(resCh chan *QueryResponse, params *QueryParam) error {
 	q := msgQuery{
 		Name:       params.Name,
 		LTime:      s.query.clock.Time(), // witness will auto-increase
-		ID:         rand.Uint32(),
+		ID:         rnd.Uint32(),
 		SourceIP:   addr,
 		SourcePort: port,
 		NodeID:     s.ID(),
