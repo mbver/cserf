@@ -1,6 +1,7 @@
 package serf
 
 import (
+	"math/rand"
 	"sync"
 	"time"
 
@@ -172,7 +173,7 @@ func (i *inactiveNodes) shouldConnect(total int) bool {
 		numAlive = 1 // guard against zero divide
 	}
 	threshold := float32(len(i.failed)) / float32(numAlive)
-	return rnd.Float32() < threshold
+	return rand.Float32() < threshold
 }
 
 func (i *inactiveNodes) pickRandomFailed() *memberlist.Node {
@@ -181,7 +182,7 @@ func (i *inactiveNodes) pickRandomFailed() *memberlist.Node {
 	if len(i.failed) == 0 {
 		return nil
 	}
-	idx := rnd.Int31n(int32(len(i.failed)))
+	idx := rand.Int31n(int32(len(i.failed)))
 	return i.failed[idx].node.Clone()
 }
 

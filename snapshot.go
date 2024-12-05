@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -458,7 +459,7 @@ func (s *Snapshotter) AliveNodes() []*NodeIDAddr {
 
 	// FISHER-YATES SHUFFLE
 	for i := range previous {
-		j := rnd.Intn(i + 1)
+		j := rand.Intn(i + 1)
 		previous[i], previous[j] = previous[j], previous[i]
 	}
 	return previous
