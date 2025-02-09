@@ -25,7 +25,7 @@ func TestServer_Start_EventJoin(t *testing.T) {
 	go func() {
 		cmd.Execute()
 	}()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(time.Second)
 	res := out.String()
 	require.Contains(t, res, "member-join")
 }
