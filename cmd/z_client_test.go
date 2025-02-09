@@ -13,6 +13,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -33,6 +34,27 @@ const (
 	scriptname = "eventscript.sh"
 	keyfile    = "keyring.json"
 )
+
+type protectedBuffer struct {
+	l   sync.RWMutex
+	buf *bytes.Buffer
+}
+
+func newProtectedBuffer() *protectedBuffer {
+	return &protectedBuffer{buf: &bytes.Buffer{}}
+}
+
+func (pw *protectedBuffer) Write(p []byte) (n int, err error) {
+	pw.l.Lock()
+	defer pw.l.Unlock()
+	return pw.buf.Write(p)
+}
+
+func (pw *protectedBuffer) String() string {
+	pw.l.RLock()
+	defer pw.l.RUnlock()
+	return pw.buf.String()
+}
 
 func nextRpcPort() int {
 	return int(atomic.AddInt32(&rpcPort, 1))
@@ -135,8 +157,8 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func captureOutput(cmd *cobra.Command) *bytes.Buffer {
-	out := &bytes.Buffer{}
+func captureOutput(cmd *cobra.Command) *protectedBuffer {
+	out := newProtectedBuffer()
 	cmd.SetOut(out)
 	cmd.SetErr(out)
 	return out
